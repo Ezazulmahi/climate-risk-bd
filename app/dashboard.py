@@ -97,7 +97,7 @@ for r in pred.latest_forecasts():
         "Drought prob.": f"{r['drought']['probability']:.0%}",
         "Risk": RISK_STYLE[r["drought"]["risk_level"]][0],
     })
-st.dataframe(pd.DataFrame(rows), hide_index=True, use_container_width=True)
+st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
 # ---------- Model quality ----------
 if pred.metrics:
