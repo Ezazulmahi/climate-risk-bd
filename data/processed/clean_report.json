@@ -1,0 +1,32 @@
+{
+  "rows_in": 3843,
+  "missing_in": {
+    "precip_mm": 0,
+    "t2m": 0,
+    "t2m_max": 0,
+    "t2m_min": 0,
+    "rh2m": 0,
+    "ws10m": 0
+  },
+  "out_of_range": {
+    "precip_mm": 0,
+    "t2m": 0,
+    "t2m_max": 0,
+    "t2m_min": 0,
+    "rh2m": 0,
+    "ws10m": 0
+  },
+  "duplicates_dropped": 0,
+  "calendar_months_added": 0,
+  "trailing_months_trimmed": 0,
+  "covariate_values_interpolated": 0,
+  "precip_missing_after_clean": 0,
+  "rows_out": 3843,
+  "period": [
+    "1981-01",
+    "2026-09"
+  ],
+  "cities_missing": [
+    "Mymensingh"
+  ]
+}
