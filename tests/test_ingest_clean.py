@@ -62,3 +62,28 @@ def test_clean_trims_trailing_months_without_rain(monthly):
     df, report = clean(raw)
     assert report["trailing_months_trimmed"] == 2
     assert df["date"].max() == raw["date"].iloc[-3]
+
+
+def test_update_refetches_only_recent_months(monkeypatch, monthly):
+    from climrisk import config, ingest
+
+    existing = monthly[monthly["city"] == "Alpha"].copy()
+    calls = []
+
+    def fake_fetch(city, start, end, refresh):
+        calls.append((city.name, start))
+        days = pd.date_range(start, "2025-02-28")
+        return _payload(days, [2.0] * len(days))
+
+    monkeypatch.setattr(config, "CITIES", (CITY, City("Gamma", 24.0, 91.0)))
+    monkeypatch.setattr(ingest, "fetch_city", fake_fetch)
+    out = ingest.update(existing, months_back=3)
+
+    # Alpha: from three months before its last month; Gamma (no data yet): full history.
+    assert calls == [("Alpha", "2024-09-01"), ("Gamma", f"{config.START_YEAR}-01-01")]
+    alpha = out[out["city"] == "Alpha"].set_index("date")
+    assert alpha.index.is_unique and alpha.index.max() == pd.Timestamp("2025-02-01")
+    # Old months untouched, refreshed months replaced.
+    assert alpha.loc["2010-05-01", "precip_mm"] == existing.set_index("date").loc[
+        "2010-05-01", "precip_mm"]
+    assert alpha.loc["2024-10-01", "precip_mm"] == 62.0

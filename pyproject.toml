@@ -7,7 +7,7 @@ name = "climrisk"
 version = "0.1.0"
 description = "Monthly rainfall-anomaly and drought-risk prediction for Bangladesh from ERA5 reanalysis"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 dependencies = [
     "pandas>=2.1",
@@ -19,6 +19,8 @@ dependencies = [
     "requests>=2.31",
     "fastapi>=0.110",
     "uvicorn[standard]>=0.27",
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.2",
 ]
 
 [project.optional-dependencies]
@@ -37,7 +39,7 @@ addopts = "-q"
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

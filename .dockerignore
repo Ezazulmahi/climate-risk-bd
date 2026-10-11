@@ -1,0 +1,10 @@
+.venv
+.pgdata
+.git
+web
+data/raw
+models
+reports/figures
+**/__pycache__
+.pytest_cache
+.ruff_cache

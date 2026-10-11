@@ -14,7 +14,7 @@ from .clean import clean
 from .eda import run_eda
 from .evaluate import evaluate
 from .features import build_features, compute_climatology
-from .ingest import ingest
+from .ingest import ingest, update
 from .train import train
 
 log = logging.getLogger(__name__)
@@ -29,14 +29,22 @@ def _read(path) -> pd.DataFrame:
     return pd.read_csv(path, parse_dates=[c for c in ("date", "target_date") if c in columns])
 
 
-def step_ingest(refresh: bool = False) -> None:
-    raw = ingest(refresh=refresh)
+def _write_clean(raw: pd.DataFrame) -> None:
     df, report = clean(raw)
     report["cities_missing"] = sorted({c.name for c in config.CITIES} - set(df["city"]))
     config.PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     df.to_csv(config.CLEAN_PATH, index=False)
     CLEAN_REPORT_PATH.write_text(json.dumps(report, indent=2), encoding="utf-8")
     log.info("Clean data: %d rows -> %s", len(df), config.CLEAN_PATH)
+
+
+def step_ingest(refresh: bool = False) -> None:
+    _write_clean(ingest(refresh=refresh))
+
+
+def step_update() -> None:
+    """Incremental refresh of recent months (used by the monthly job)."""
+    _write_clean(update(_read(config.CLEAN_PATH)))
 
 
 def step_features() -> None:
@@ -69,6 +77,16 @@ def step_evaluate() -> dict:
     metrics = evaluate(bundle, feat)
     log.info("Evaluation written to %s", config.REPORTS_DIR / "evaluation.md")
     return metrics
+
+
+def step_db_sync() -> dict:
+    from .db import get_engine  # imported lazily so the offline pipeline needs no database
+    from .sync import sync
+
+    feat = _read(config.FEATURES_PATH)
+    bundle = joblib.load(config.BUNDLE_PATH)
+    metrics = json.loads(config.METRICS_PATH.read_text()) if config.METRICS_PATH.exists() else None
+    return sync(get_engine(), feat, bundle, metrics)
 
 
 def run_all(refresh: bool = False) -> None:

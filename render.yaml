@@ -1,0 +1,18 @@
+# Render Blueprint (free tier) for the API. Render dashboard: New > Blueprint > this repo > Apply.
+# Database: Neon (free). Paste its connection string (ending in ?sslmode=require) when Render
+# asks for DATABASE_URL. The web app runs on Vercel with API_URL = this service's URL.
+# On every deploy the container trains from the committed data and republishes forecasts, so
+# the monthly refresh workflow only has to commit new data for the site to update.
+# Free-tier caveat: the API sleeps after ~15 min idle (first request takes ~1 min).
+services:
+  - type: web
+    name: climate-risk-bd-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        sync: false

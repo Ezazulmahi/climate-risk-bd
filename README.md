@@ -1,8 +1,13 @@
 # climate-risk-bd: Bangladesh rainfall and drought outlook
 
-One-month-ahead **rainfall-anomaly** and **drought-risk** forecasts for Bangladesh divisional cities, built on 45 years of ERA5 reanalysis. The project includes a reproducible pipeline, honest baselines, uncertainty estimates, a FastAPI service and a Streamlit dashboard.
+A full-stack forecasting app. It gives one-month-ahead **rainfall** and **drought-risk** forecasts for Bangladesh divisions, built on 45 years of ERA5 reanalysis, and stores every past forecast so its accuracy can be checked against what actually fell.
 
-![Dhaka test-period forecasts](reports/figures/eval_forecast_dhaka.png)
+- **ML pipeline (Python):** data audit, cleaning, SPI, leakage-safe features, honest baselines, uncertainty and error analysis.
+- **Backend:** FastAPI on PostgreSQL, serving observations, forecasts, verification and metrics.
+- **Frontend:** Next.js 16 with a risk map, division pages with forecast-vs-observed charts, and a model and accuracy page.
+- **Ops:** Docker Compose, a Render + Neon + Vercel deployment and a monthly data-refresh workflow.
+
+![Outlook page](docs/screenshot-outlook.jpg)
 
 ## What I found
 
@@ -57,30 +62,65 @@ ingest ─► clean ─► features ─► EDA
 - SPI fitted on the reference period is unaffected by later data.
 - The split is ordered and disjoint, and targets never cross between cities.
 
-## Quick start
+## Architecture
+
+```
+ Open-Meteo (ERA5)                     GitHub Actions, monthly: update → train → evaluate → commit
+        │                                                    │ push triggers redeploy
+        ▼                                                    ▼
+ Python pipeline ── db-sync ──► PostgreSQL ◄── FastAPI (Render) ◄── Next.js server (Vercel) ◄── browser
+ (src/climrisk)                 (Neon)         reads only            fetches on the server
+```
+
+The model runs offline. `db-sync` writes the observations, a stored forecast for every validation and test month (each with its outcome), the live forecast and the evaluation metrics. The API only reads, and the web app only talks to the API from its server, so no API URL or credentials reach the browser.
+
+| Table | Contents |
+|---|---|
+| `cities` | name, latitude, longitude |
+| `observations` | monthly rainfall, normal, anomaly, SPI-3, temperature, humidity |
+| `forecasts` | per model version, city and month: expected rainfall, 80% range, normal, drought probability, risk level, split (`validation` / `test` / `live`) |
+| `model_runs` | model version, data-through date, metadata, full test metrics; one is active |
+
+## Run it locally
+
+**1. Python pipeline** (Python 3.11 or newer)
 
 ```bash
 python -m venv .venv
 ```
 ```bash
-.venv/Scripts/activate        # Windows
+.venv/Scripts/activate
 ```
-```bash
-source .venv/bin/activate     # macOS/Linux
-```
+On macOS/Linux use `source .venv/bin/activate` instead.
 ```bash
 pip install -e ".[dashboard,dev]"
 ```
 ```bash
-python -m climrisk all        # download → clean → features → EDA → train → evaluate (~1 min with cached data)
+python -m climrisk all
 ```
+That runs download → clean → features → EDA → train → evaluate, about 1 minute with cached data.
 ```bash
 pytest
 ```
 
-Each step can also run alone: `python -m climrisk ingest | features | eda | train | evaluate`. The processed data is committed, so `train` and `evaluate` work without downloading anything.
+The processed data is committed, so `train` and `evaluate` work offline. `python -m climrisk update` fetches only recent months, which is what the monthly job uses.
 
-### API
+**2. PostgreSQL.** Any Postgres works; set `DATABASE_URL` (see `.env.example`). Without Docker, a throwaway local server with no password, on port 54330:
+
+```bash
+initdb -D .pgdata -U climrisk -A trust
+```
+```bash
+pg_ctl -D .pgdata -o "-p 54330" -l .pgdata/server.log start
+```
+```bash
+createdb -h localhost -p 54330 -U climrisk climrisk
+```
+```bash
+python -m climrisk db-sync
+```
+
+**3. API**
 
 ```bash
 uvicorn climrisk.api:app --reload
@@ -90,26 +130,60 @@ Interactive docs are at http://127.0.0.1:8000/docs.
 
 | Endpoint | Returns |
 |---|---|
-| `GET /predict?city=Dhaka&month=2026-10` | Expected rainfall, 80% range, normal, drought probability vs usual rate, risk level, and the observed outcome if known |
-| `GET /forecast/latest` | The newest unobserved month for every city |
-| `GET /history?city=Sylhet&start=2020-01` | Monthly rainfall, normal, anomaly and SPI-3 |
-| `GET /cities`, `/metrics`, `/health` | Metadata and test metrics |
+| `GET /forecasts/latest` | The live forecast for every division |
+| `GET /forecast?city=Dhaka&month=2024-08` | One stored forecast, with its observed outcome if known |
+| `GET /forecasts?city=Sylhet&start=2022-01` | A city's forecast history with outcomes |
+| `GET /verification?city=Dhaka` | Skill, interval coverage and drought Brier score computed from stored forecasts |
+| `GET /history?city=Sylhet&start=2020-01` | Monthly rainfall, normal, anomaly, SPI-3 |
+| `GET /cities`, `/metrics`, `/health` | Locations, full test evaluation, status |
 
-### Dashboard
+**4. Web app**
 
 ```bash
-streamlit run app/dashboard.py
+cd web
 ```
+```bash
+npm install
+```
+```bash
+npm run dev
+```
+
+Then open http://localhost:3000. Set `API_URL` if the API isn't on `http://localhost:8000`.
+
+**Or all at once with Docker:**
+
+```bash
+docker compose up --build
+```
+
+That starts Postgres, the API (trains at build time, publishes on start) and the web app on http://localhost:3000.
+
+The Streamlit notebook-style dashboard (`streamlit run app/dashboard.py`) is still there for analysis; it reads the model files directly.
+
+## Deploy (free tiers)
+
+| Piece | Service | Setup |
+|---|---|---|
+| Database | [Neon](https://neon.tech) | Create a project and copy the connection string (`...?sslmode=require`) |
+| API | [Render](https://render.com) | New → Blueprint → this repo (`render.yaml`); paste the Neon URL as `DATABASE_URL` |
+| Web | [Vercel](https://vercel.com) | Import the repo, set root directory to `web`, and set `API_URL` to the Render URL |
+| Refresh | GitHub Actions | `.github/workflows/refresh.yml` runs on the 10th of each month and commits new data, which redeploys the API, which republishes forecasts |
+
+On each deploy, the Docker image retrains from the committed data. Training years are fixed and seeds are set, so the model version is identical across rebuilds. Only the live forecast and the verified months move forward.
 
 ## Project layout
 
 ```
-src/climrisk/   config · ingest · clean · spi · features · train · evaluate · eda · predict · api · cli
-app/            Streamlit dashboard
-tests/          35 offline tests on synthetic data (ingest, cleaning, SPI, leakage, models, API)
+src/climrisk/   config · ingest · clean · spi · features · train · evaluate · eda · predict
+                db · sync (Postgres publishing) · api (FastAPI) · cli
+web/            Next.js app: outlook map, /city/[name], /model
+app/            Streamlit analysis dashboard
+tests/          41 offline tests (ingest, cleaning, SPI, leakage, models, DB sync, API)
 scripts/        check_power_homogeneity.py (the data-source audit)
 data/processed/ cleaned monthly data and features (committed; raw downloads are cached, not committed)
 reports/        generated EDA, evaluation, metrics.json and figures
+Dockerfile · docker-compose.yml · render.yaml · .github/workflows/{ci,refresh}.yml
 ```
 
 ## Limitations
@@ -121,7 +195,7 @@ ERA5 is reanalysis, not gauge data, and a single grid point stands in for a whol
 - Add ENSO (ONI) and Indian Ocean Dipole indices, the most plausible source of real one-month rainfall skill.
 - Benchmark against ECMWF SEAS5 seasonal forecasts.
 - Compare with BMD station gauges.
-- Store forecasts in PostgreSQL for live verification over time.
+- Freeze each month's live forecast at issue time. Today a retrained model version re-issues its own hindcasts; storing the original issue alongside would make verification fully prospective.
 
 ## License
 

@@ -133,6 +133,35 @@ def to_monthly(daily: pd.DataFrame, city: City, min_coverage: float = 1.0) -> pd
     return out.drop(columns="period")
 
 
+def update(existing: pd.DataFrame, months_back: int = 3) -> pd.DataFrame:
+    """Refresh only the recent past and merge it into already-cleaned monthly data.
+
+    Downloads ``months_back`` months before each city's latest month up to today,
+    so a monthly refresh is a handful of small requests instead of 46 years per
+    city. A city with no existing data gets its full history. If a download
+    fails, that city keeps its existing rows.
+    """
+    frames = []
+    today = date.today().isoformat()
+    for city in config.CITIES:
+        have = existing[existing["city"] == city.name]
+        if have.empty:
+            start = f"{config.START_YEAR}-01-01"
+        else:
+            start = (have["date"].max() - pd.DateOffset(months=months_back)).strftime("%Y-%m-01")
+        log.info("Updating %s from %s", city.name, start)
+        try:
+            payload = fetch_city(city, start=start, end=today, refresh=True)
+        except requests.RequestException as exc:
+            log.error("Keeping existing %s data: download failed (%s)", city.name, exc)
+            frames.append(have)
+            continue
+        fresh = to_monthly(parse_daily(payload), city)
+        frames.append(pd.concat([have[have["date"] < pd.Timestamp(start)], fresh]))
+    frames = [f for f in frames if not f.empty]
+    return pd.concat(frames, ignore_index=True)
+
+
 def ingest(
     cities: Iterable[City] = config.CITIES,
     raw_dir: Path = config.RAW_DIR,

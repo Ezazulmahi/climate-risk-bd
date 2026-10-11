@@ -9,11 +9,13 @@ from . import pipeline
 
 STEPS = {
     "ingest": "download (or load cached) ERA5 data and clean it",
+    "update": "fetch only recent months and merge into the processed data",
     "features": "compute climatology, SPI and model features",
     "eda": "exploratory figures and reports/eda.md",
     "train": "fit baselines and models, save models/model_bundle.joblib",
     "evaluate": "score on the held-out test years, write reports/evaluation.md",
-    "all": "run every step in order",
+    "all": "run every step in order (ingest .. evaluate)",
+    "db-sync": "publish observations, forecasts and metrics to DATABASE_URL",
 }
 
 
@@ -30,6 +32,8 @@ def main(argv: list[str] | None = None) -> None:
     refresh = getattr(args, "refresh", False)
     {
         "ingest": lambda: pipeline.step_ingest(refresh),
+        "update": pipeline.step_update,
+        "db-sync": pipeline.step_db_sync,
         "features": pipeline.step_features,
         "eda": pipeline.step_eda,
         "train": pipeline.step_train,

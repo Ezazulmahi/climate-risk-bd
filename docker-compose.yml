@@ -1,0 +1,40 @@
+# Full stack locally: `docker compose up --build`, then open http://localhost:3000
+#   db   Postgres 17 (named volume)
+#   api  FastAPI; trains at build, publishes forecasts to db on start  -> http://localhost:8000/docs
+#   web  Next.js, server-side calls to the api container               -> http://localhost:3000
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: climrisk
+      POSTGRES_PASSWORD: climrisk
+      POSTGRES_DB: climrisk
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U climrisk -d climrisk"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://climrisk:climrisk@db:5432/climrisk
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./web
+    environment:
+      API_URL: http://api:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  db-data:
