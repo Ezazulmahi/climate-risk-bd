@@ -9,6 +9,54 @@ A full-stack forecasting app. It gives one-month-ahead **rainfall** and **drough
 
 ![Outlook page](docs/screenshot-outlook.jpg)
 
+## What this project does, in plain words
+
+Bangladesh's farming, water supply and flood planning all depend on rain, and most of it falls in a few monsoon months. A dry spell at the wrong time can ruin a rice crop. This project answers two questions for each division, one month ahead:
+
+1. **How much rain is likely next month?** Each forecast is a best guess plus a range, compared with what is normal for that month.
+2. **What is the chance that next month tips into drought?** The answer is a probability, shown next to the usual chance.
+
+It then **checks its own work**. Every forecast it would have made since 2016 is stored next to the rain that actually fell, so anyone can see how often it was right. The website shows that track record next to every forecast.
+
+### How it works, step by step
+
+| Step | What happens | Where in the code |
+|---|---|---|
+| 1. Collect | Downloads 45 years (1981 to now) of daily rain, temperature, humidity and wind for each division from ERA5, a global weather record built by the European weather centre ECMWF. Free, via Open-Meteo | `src/climrisk/ingest.py` |
+| 2. Check the data | Compares sources before trusting any. NASA's POWER dataset, the obvious first choice, turned out to change its rainfall levels over time, so it was rejected (see "What I found") | `scripts/check_power_homogeneity.py` |
+| 3. Clean | Adds daily values up into monthly totals, removes impossible values, makes sure no month is missing, and drops the current unfinished month | `src/climrisk/clean.py` |
+| 4. Describe "normal" | For every division and calendar month, works out the 1981–2015 average rainfall, and a drought index (SPI) that says how unusually dry or wet a period is | `src/climrisk/spi.py`, `features.py` |
+| 5. Build clues | For each month, collects what was known at the end of it: how wet the last few months were, current drought index, temperature, humidity and season | `src/climrisk/features.py` |
+| 6. Train and compare | Fits simple baselines (e.g. "assume a normal month") and machine-learning models on 1982–2015, tunes them on 2016–2019 and tests them once on 2020 onward | `src/climrisk/train.py`, `evaluate.py` |
+| 7. Publish | Saves every forecast, the observed outcomes and the accuracy scores into a PostgreSQL database | `src/climrisk/sync.py`, `db.py` |
+| 8. Serve | A FastAPI web service answers questions like "forecast for Dhaka, October 2026" from the database | `src/climrisk/api.py` |
+| 9. Show | A Next.js website draws the map, forecast cards, charts and track record | `web/` |
+| 10. Repeat | Once a month an automated job downloads the newest month, rebuilds and republishes, so the site moves forward on its own | `.github/workflows/refresh.yml` |
+
+### How to read a forecast
+
+Example from the live site, **Dhaka, October 2026**:
+
+> Expected rainfall **104 mm** (normal is 138 mm). 80% range **41–149 mm**. Drought probability **62%** (usually 16%): **High** risk.
+
+- **Expected rainfall** is the single best guess. Treat it loosely, because the evaluation shows rainfall amounts a month ahead are hard to predict.
+- **80% range:** in 8 out of 10 months the real total should land inside it. This is the number to plan with.
+- **Normal:** the 1981–2015 average for that month, for comparison.
+- **Drought probability:** the chance that the 3 months ending next month are among the driest ~16% on record for that time of year. "Usually 16%" is the background rate. 62% means drought is about four times more likely than usual. Most of that signal comes from the two months that have already been dry.
+- **Risk level:** *Low*, *Elevated* (≥1.5× the usual chance) or *High* (≥2.5× and at least 50%).
+
+### Key terms
+
+| Term | Meaning |
+|---|---|
+| **Anomaly** | How far a month's rainfall is from normal, e.g. "−34 mm vs normal" |
+| **SPI-3** | Standardized Precipitation Index over 3 months. 0 = typical; −1 or below = drought (roughly the driest 16%); +1 or above = wet |
+| **Reanalysis (ERA5)** | A gap-free reconstruction of past weather that blends observations with a weather model. Consistent, but not a rain gauge |
+| **Baseline** | The simplest reasonable forecast, used to judge whether a model adds anything. A model that can't beat it isn't useful |
+| **Skill** | How much a model reduces error compared with a baseline. 0% = no better; negative = worse |
+| **Hindcast** | A forecast made for a past month using only the data available before it, so it can be checked fairly |
+| **Brier score** | Accuracy of probability forecasts (lower is better) |
+
 ## What I found
 
 1. **The obvious dataset was broken, so I checked before modelling.** NASA POWER's corrected precipitation reads 37–64% of ERA5 before 1997 and 107–231% after 2016, in every city. Dhaka goes from about 1,000 mm/yr in the 1990s to 4,600 mm in 2017. A model trained on it showed a "35% skill gain" that was really the model learning the data error. I switched to ERA5. ([check](reports/data_source_check.md))
