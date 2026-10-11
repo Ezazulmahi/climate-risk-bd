@@ -229,6 +229,7 @@ web/            Next.js app: outlook map, /city/[name], /model
 app/            Streamlit analysis dashboard
 tests/          41 offline tests (ingest, cleaning, SPI, leakage, models, DB sync, API)
 scripts/        check_power_homogeneity.py (the data-source audit)
+docs/           landscape.md (related work, US–Bangladesh gap, roadmap) and screenshots
 data/processed/ cleaned monthly data and features (committed; raw downloads are cached, not committed)
 reports/        generated EDA, evaluation, metrics.json and figures
 Dockerfile · docker-compose.yml · render.yaml · .github/workflows/{ci,refresh}.yml
@@ -238,12 +239,35 @@ Dockerfile · docker-compose.yml · render.yaml · .github/workflows/{ci,refresh
 
 ERA5 is reanalysis, not gauge data, and a single grid point stands in for a whole division. Extremes are under-predicted. The test set covers only about 7 years. Climatology is fixed to 1981–2015. Sylhet's significant drying trend in ERA5 (−222 mm/decade) should be checked against gauges before anyone trusts it. **This is a portfolio demo, not an operational forecast.** Use [BMD](https://live6.bmd.gov.bd/) and [FFWC](http://www.ffwc.gov.bd/) for real decisions. More detail is in [`MODEL_CARD.md`](MODEL_CARD.md).
 
-## Next steps
+## Related work and how this differs
 
-- Add ENSO (ONI) and Indian Ocean Dipole indices, the most plausible source of real one-month rainfall skill.
-- Benchmark against ECMWF SEAS5 seasonal forecasts.
-- Compare with BMD station gauges.
-- Freeze each month's live forecast at issue time. Today a retrained model version re-issues its own hindcasts; storing the original issue alongside would make verification fully prospective.
+Machine-learning forecasts of SPI and rainfall in Bangladesh are well studied. The closest work is [*Forecasting SPI using data intelligence models: regional investigation of Bangladesh*](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC7873304/) (Scientific Reports, 2021), alongside several station-level random-forest, SVM and LSTM studies. This project doesn't claim a new model. What it adds:
+
+- an audit of the data source before modelling;
+- a strict time-based split with leakage tests;
+- baselines strong enough to show where ML does and doesn't help;
+- calibrated uncertainty;
+- a deployed service that publishes its own track record.
+
+The full comparison table is in [`docs/landscape.md`](docs/landscape.md).
+
+## What the US has that Bangladesh lacks
+
+Public climate-risk tools that are routine in the US have no continuous equivalent here: the US Drought Monitor, drought.gov, NOAA's probabilistic outlooks with published verification, NWS HeatRisk, CDC-style outbreak forecasting and USDA satellite yield forecasts. This project is a first step toward a Bangladesh version of several of them. See [`docs/landscape.md`](docs/landscape.md#2-what-the-us-has-that-bangladesh-lacks-climate-risk).
+
+## Roadmap
+
+| Next | Why |
+|---|---|
+| **Bangladesh Drought Monitor**: all 64 districts, monthly map + outlook | Closest equivalent to the US Drought Monitor; ERA5 already covers the country |
+| **Add ENSO and Indian Ocean Dipole indices** | The most plausible source of real one-month rainfall skill |
+| **Dhaka heat-stress forecast** | Heat-health warnings, similar to NWS HeatRisk; data already ingested |
+| **Dengue outbreak forecast for Dhaka** | Weather-driven; reuses the full pipeline, similar to CDC FluSight |
+| **Rice yield outlook per district** | Adds satellite NDVI, similar to USDA yield forecasts |
+| **Drought-index insurance simulator** | Back-tests payout triggers on 45 years of SPI |
+| **Gauge validation** against BMD stations, and **prospective verification** (freeze each forecast at issue time) | Stronger evidence of accuracy |
+
+Details, data sources and baselines for each are in [`docs/landscape.md`](docs/landscape.md#3-roadmap).
 
 ## License
 
