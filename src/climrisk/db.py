@@ -45,6 +45,7 @@ observations = sa.Table(
     sa.Column("spi3", sa.Float),
     sa.Column("t2m", sa.Float),
     sa.Column("rh2m", sa.Float),
+    sa.Column("heatwave_days", sa.Float),
 )
 
 forecasts = sa.Table(
@@ -62,6 +63,9 @@ forecasts = sa.Table(
     sa.Column("drought_prob", sa.Float, nullable=False),
     sa.Column("drought_base_rate", sa.Float, nullable=False),
     sa.Column("risk_level", sa.String(16), nullable=False),
+    sa.Column("heat_days_expected", sa.Float),
+    sa.Column("heat_days_normal", sa.Float),
+    sa.Column("heat_days_recent", sa.Float),
     sa.Index("ix_forecasts_city_month", "city", "target_month"),
 )
 
@@ -80,6 +84,7 @@ issued_forecasts = sa.Table(
     sa.Column("drought_prob", sa.Float, nullable=False),
     sa.Column("drought_base_rate", sa.Float, nullable=False),
     sa.Column("risk_level", sa.String(16), nullable=False),
+    sa.Column("heat_days_expected", sa.Float),
 )
 
 districts = sa.Table(
@@ -141,4 +146,19 @@ def get_engine(url: str | None = None) -> Engine:
 
 
 def create_schema(engine: Engine) -> None:
+    """Create missing tables, then add any missing *nullable* columns.
+
+    A deliberately tiny migration step: new optional columns (like the heat-wave
+    fields) appear in an existing database without dropping data.
+    """
     metadata.create_all(engine)
+    inspector = sa.inspect(engine)
+    with engine.begin() as conn:
+        for table in metadata.sorted_tables:
+            existing = {c["name"] for c in inspector.get_columns(table.name)}
+            for col in table.columns:
+                if col.name not in existing and col.nullable:
+                    ddl = col.type.compile(dialect=engine.dialect)
+                    conn.execute(
+                        sa.text(f'ALTER TABLE {table.name} ADD COLUMN "{col.name}" {ddl}')
+                    )

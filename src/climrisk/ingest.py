@@ -118,6 +118,10 @@ def to_monthly(daily: pd.DataFrame, city: City, min_coverage: float = 1.0) -> pd
         if var in daily:
             agg[name] = daily[var].groupby(month).agg(how)
     out = pd.DataFrame(agg)
+    if "temperature_2m_max" in daily:
+        # BMD heat-wave day: maximum temperature of 36 °C or more.
+        hot = daily["temperature_2m_max"] >= config.HEATWAVE_TMAX_C
+        out["heatwave_days"] = hot.groupby(month).sum().astype(float)
     days_present = daily["precipitation_sum"].notna().groupby(month).sum()
     days_in_month = out.index.days_in_month
     out["days_with_data"] = days_present

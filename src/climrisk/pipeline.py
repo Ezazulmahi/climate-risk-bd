@@ -93,7 +93,13 @@ def step_db_sync() -> dict:
     feat = _read(config.FEATURES_PATH)
     bundle = joblib.load(config.BUNDLE_PATH)
     metrics = json.loads(config.METRICS_PATH.read_text()) if config.METRICS_PATH.exists() else None
-    counts = sync(get_engine(), feat, bundle, metrics)
+    from .heat import HEAT_BUNDLE_PATH, HEAT_METRICS_PATH
+    from .sync import heat_table
+
+    heat = None
+    if HEAT_BUNDLE_PATH.exists():
+        heat = heat_table(joblib.load(HEAT_BUNDLE_PATH), feat)
+    counts = sync(get_engine(), feat, bundle, metrics, heat)
 
     from .districts import DISTRICT_EVAL_PATH, DISTRICT_GEOJSON_PATH, DISTRICT_MONTHLY_PATH
     from .validation import VALIDATION_PATH
@@ -102,7 +108,8 @@ def step_db_sync() -> dict:
         docs = {
             name: json.loads(path.read_text(encoding="utf-8"))
             for name, path in (("district_outlook_eval", DISTRICT_EVAL_PATH),
-                               ("era5_chirps_validation", VALIDATION_PATH))
+                               ("era5_chirps_validation", VALIDATION_PATH),
+                               ("heat_metrics", HEAT_METRICS_PATH))
             if path.exists()
         }
         counts.update(sync_districts(
@@ -114,6 +121,12 @@ def step_db_sync() -> dict:
     else:
         log.info("No district data; run `python -m climrisk districts` to build it")
     return counts
+
+
+def step_heat() -> dict:
+    from .heat import run
+
+    return run(_read(config.FEATURES_PATH))[1]
 
 
 def step_districts(refresh: bool = False) -> None:
@@ -136,3 +149,4 @@ def run_all(refresh: bool = False) -> None:
     step_eda()
     step_train()
     step_evaluate()
+    step_heat()

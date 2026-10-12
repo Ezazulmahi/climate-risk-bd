@@ -43,7 +43,9 @@ def _none_if_nan(records: list[dict]) -> list[dict]:
     ]
 
 
-def build_forecast_rows(bundle: dict, feat: pd.DataFrame, version: str) -> list[dict]:
+def build_forecast_rows(
+    bundle: dict, feat: pd.DataFrame, version: str, heat: pd.DataFrame | None = None
+) -> list[dict]:
     rows = feat.dropna(subset=bundle["feature_columns"])
     rows = rows[rows["target_date"].dt.year > config.TRAIN_END]
     reg = predict_regression(bundle, rows)
@@ -68,7 +70,12 @@ def build_forecast_rows(bundle: dict, feat: pd.DataFrame, version: str) -> list[
         "drought_base_rate": round(base, 4),
         "risk_level": [risk_level(p, base) for p in prob],
     })
-    return out.to_dict(orient="records")
+    if heat is not None:
+        h = heat.set_index(["city", "date"])
+        key = pd.MultiIndex.from_arrays([rows["city"], rows["date"]])
+        for col in ("heat_days_expected", "heat_days_normal", "heat_days_recent"):
+            out[col] = h[col].reindex(key).round(2).to_numpy()
+    return _none_if_nan(out.to_dict(orient="records"))
 
 
 def build_observation_rows(feat: pd.DataFrame) -> list[dict]:
@@ -81,11 +88,33 @@ def build_observation_rows(feat: pd.DataFrame) -> list[dict]:
         "spi3": feat["spi3"].round(3),
         "t2m": feat["t2m"].round(2),
         "rh2m": feat["rh2m"].round(2),
+        "heatwave_days": feat["heatwave_days"] if "heatwave_days" in feat else np.nan,
     })
     return _none_if_nan(obs.to_dict(orient="records"))
 
 
-def sync(engine: Engine, feat: pd.DataFrame, bundle: dict, metrics: dict | None) -> dict:
+def heat_table(heat_bundle: dict, feat: pd.DataFrame) -> pd.DataFrame:
+    """Heat-wave outlook for every city-month, keyed by issue month."""
+    from .heat import build_heat_features, predict_heat
+
+    d = build_heat_features(feat)
+    usable = d.dropna(subset=["hw_normal_next", "hw_recent_next", "heatwave_days"])
+    return pd.DataFrame({
+        "city": usable["city"],
+        "date": usable["date"],
+        "heat_days_expected": predict_heat(heat_bundle, usable),
+        "heat_days_normal": usable["hw_normal_next"],
+        "heat_days_recent": usable["hw_recent_next"],
+    })
+
+
+def sync(
+    engine: Engine,
+    feat: pd.DataFrame,
+    bundle: dict,
+    metrics: dict | None,
+    heat: pd.DataFrame | None = None,
+) -> dict:
     create_schema(engine)
     version = model_version(bundle)
     coords = feat.groupby("city")[["lat", "lon"]].first()
@@ -93,7 +122,7 @@ def sync(engine: Engine, feat: pd.DataFrame, bundle: dict, metrics: dict | None)
         {"name": name, "lat": float(r.lat), "lon": float(r.lon)} for name, r in coords.iterrows()
     ]
     obs_rows = build_observation_rows(feat)
-    fc_rows = build_forecast_rows(bundle, feat, version)
+    fc_rows = build_forecast_rows(bundle, feat, version, heat)
     run = {
         "version": version,
         "created_at": datetime.now(UTC),
@@ -123,7 +152,9 @@ def sync(engine: Engine, feat: pd.DataFrame, bundle: dict, metrics: dict | None)
         i = issued_forecasts.c
         frozen = {(r.city, r.target_month) for r in conn.execute(sa.select(i.city, i.target_month))}
         new_issues = [
-            {k: v for k, v in r.items() if k != "split"} | {"issued_at": run["created_at"]}
+            {k: v for k, v in r.items()
+             if k not in ("split", "heat_days_normal", "heat_days_recent")}
+            | {"issued_at": run["created_at"]}
             for r in fc_rows
             if r["split"] == "live" and (r["city"], r["target_month"]) not in frozen
         ]

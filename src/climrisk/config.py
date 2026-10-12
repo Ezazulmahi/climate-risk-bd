@@ -67,6 +67,10 @@ INTERVAL_ALPHA = 0.2  # 80% prediction intervals
 
 RANDOM_STATE = 42
 
+# Bangladesh Meteorological Department: a heat-wave day has Tmax >= 36 °C
+# (mild 36-38, moderate 38-40, severe 40-42, very severe >= 42).
+HEATWAVE_TMAX_C = 36.0
+
 # Add ENSO/IOD indices as features. Decided on the validation years by
 # `python -m climrisk experiment` (see reports/experiments.md).
 USE_CLIMATE_INDICES = False

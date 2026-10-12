@@ -85,7 +85,12 @@ def _city(conn: Connection, name: str) -> str:
 def _forecast_query(version: str):
     o = observations
     return (
-        sa.select(forecasts, o.c.precip_mm.label("observed_mm"), o.c.spi3.label("observed_spi3"))
+        sa.select(
+            forecasts,
+            o.c.precip_mm.label("observed_mm"),
+            o.c.spi3.label("observed_spi3"),
+            o.c.heatwave_days.label("observed_heat_days"),
+        )
         .select_from(
             forecasts.outerjoin(
                 o, (o.c.city == forecasts.c.city) & (o.c.month == forecasts.c.target_month)
@@ -106,6 +111,15 @@ def _forecast_dict(row) -> dict:
             "spi3_category": classify(spi3) if spi3 is not None else "unknown",
             "drought": spi3 is not None and spi3 <= -1.0,
             "inside_interval": r["lower_mm"] <= r["observed_mm"] <= r["upper_mm"],
+            "heatwave_days": r["observed_heat_days"],
+        }
+    heat = None
+    if r["heat_days_expected"] is not None:
+        heat = {
+            "expected_days": r["heat_days_expected"],
+            "normal_days": r["heat_days_normal"],
+            "recent_decade_days": r["heat_days_recent"],
+            "threshold_c": 36,
         }
     return {
         "city": r["city"],
@@ -123,6 +137,7 @@ def _forecast_dict(row) -> dict:
             "usual_probability": r["drought_base_rate"],
             "risk_level": r["risk_level"],
         },
+        "heat": heat,
         "observed": observed,
         "model_version": r["model_version"],
     }
@@ -376,6 +391,12 @@ def district_history(
 def data_validation(conn: Connection = Depends(get_conn)) -> list[dict]:
     """Agreement between ERA5 (city model) and CHIRPS (satellite + gauges) at each city."""
     return _document(conn, "era5_chirps_validation")
+
+
+@app.get("/heat/evaluation")
+def heat_evaluation(conn: Connection = Depends(get_conn)) -> dict:
+    """Test-period skill of the heat-wave-days outlook against two baselines."""
+    return _document(conn, "heat_metrics")
 
 
 @app.get("/metrics")

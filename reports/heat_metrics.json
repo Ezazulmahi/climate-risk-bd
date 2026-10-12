@@ -1,0 +1,55 @@
+{
+  "n_test": 154,
+  "hot_season_definition": "normal >= 0.5 heat-wave days",
+  "mean_observed_days": 3.8376623376623376,
+  "mean_normal_days": 3.614285714285714,
+  "mae_days": {
+    "normal": 3.3428571428571434,
+    "recent": 3.242207792207792,
+    "model": 3.188285611891851
+  },
+  "skill_vs_normal": 0.04623934686995923,
+  "skill_vs_recent": 0.016631315378840217,
+  "skill_vs_recent_95ci": [
+    -0.09846473728499275,
+    0.16137065323713676
+  ],
+  "recent_vs_normal": 0.030108780108780375,
+  "by_city": [
+    {
+      "city": "Barishal",
+      "err_model": 2.96,
+      "err_recent": 3.07
+    },
+    {
+      "city": "Dhaka",
+      "err_model": 3.75,
+      "err_recent": 3.98
+    },
+    {
+      "city": "Khulna",
+      "err_model": 3.09,
+      "err_recent": 3.41
+    },
+    {
+      "city": "Mymensingh",
+      "err_model": 2.19,
+      "err_recent": 2.16
+    },
+    {
+      "city": "Rajshahi",
+      "err_model": 4.33,
+      "err_recent": 4.03
+    },
+    {
+      "city": "Rangpur",
+      "err_model": 2.7,
+      "err_recent": 2.71
+    }
+  ],
+  "params": {
+    "learning_rate": 0.03,
+    "max_depth": 3,
+    "max_iter": 150
+  }
+}

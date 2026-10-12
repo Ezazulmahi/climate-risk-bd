@@ -18,6 +18,7 @@ STEPS = {
     "db-sync": "publish observations, forecasts and metrics to DATABASE_URL",
     "experiment": "compare the model with and without ENSO/IOD indices",
     "districts": "64-district drought monitor from CHIRPS, and the ERA5 check",
+    "heat": "train and evaluate the heat-wave-days outlook",
 }
 
 
@@ -38,6 +39,7 @@ def main(argv: list[str] | None = None) -> None:
         "db-sync": pipeline.step_db_sync,
         "experiment": pipeline.step_experiment,
         "districts": lambda: pipeline.step_districts(refresh),
+        "heat": pipeline.step_heat,
         "features": pipeline.step_features,
         "eda": pipeline.step_eda,
         "train": pipeline.step_train,

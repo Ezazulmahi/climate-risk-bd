@@ -13,6 +13,7 @@ VALID_RANGES = {
     "t2m_min": (-5.0, 40.0),
     "rh2m": (0.0, 100.0),
     "ws10m": (0.0, 100.0),  # km/h, monthly mean
+    "heatwave_days": (0.0, 31.0),  # days with Tmax >= 36 °C
 }
 MAX_GAP_MONTHS = 2  # interior gaps up to this length are interpolated (not precipitation)
 

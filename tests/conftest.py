@@ -41,6 +41,7 @@ def make_monthly(start="1981-01", end="2024-12", seed=0) -> pd.DataFrame:
                     "t2m_min": 21 + rng.normal(0, 0.5, n),
                     "rh2m": np.clip(75 + 10 * signal + rng.normal(0, 2, n), 0, 100),
                     "ws10m": 8 + rng.normal(0, 1, n),
+                    "heatwave_days": rng.poisson(np.clip(8 * season, 0, None)).astype(float),
                 }
             )
         )
