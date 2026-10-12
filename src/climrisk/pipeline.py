@@ -87,41 +87,40 @@ def step_evaluate() -> dict:
 
 
 def step_db_sync() -> dict:
-    from .db import get_engine  # imported lazily so the offline pipeline needs no database
-    from .sync import sync, sync_districts
+    """Publish everything the API serves. Optional parts are skipped if not built."""
+    # Imported lazily so the offline pipeline needs no database driver.
+    from .db import get_engine
+    from .dengue import DENGUE_RESULTS
+    from .districts import DISTRICT_EVAL_PATH, DISTRICT_GEOJSON_PATH, DISTRICT_MONTHLY_PATH
+    from .explain import explain_drought
+    from .heat import HEAT_BUNDLE_PATH, HEAT_METRICS_PATH
+    from .sync import heat_table, publish_documents, sync, sync_districts
+    from .validation import VALIDATION_PATH
 
+    engine = get_engine()
     feat = _read(config.FEATURES_PATH)
     bundle = joblib.load(config.BUNDLE_PATH)
     metrics = json.loads(config.METRICS_PATH.read_text()) if config.METRICS_PATH.exists() else None
-    from .dengue import DENGUE_RESULTS
-    from .heat import HEAT_BUNDLE_PATH, HEAT_METRICS_PATH
-    from .sync import heat_table
-
-    heat = None
-    if HEAT_BUNDLE_PATH.exists():
-        heat = heat_table(joblib.load(HEAT_BUNDLE_PATH), feat)
-    counts = sync(get_engine(), feat, bundle, metrics, heat)
-
-    from .districts import DISTRICT_EVAL_PATH, DISTRICT_GEOJSON_PATH, DISTRICT_MONTHLY_PATH
-    from .validation import VALIDATION_PATH
+    heat = heat_table(joblib.load(HEAT_BUNDLE_PATH), feat) if HEAT_BUNDLE_PATH.exists() else None
+    counts = sync(engine, feat, bundle, metrics, heat)
 
     if DISTRICT_MONTHLY_PATH.exists():
-        docs = {
-            name: json.loads(path.read_text(encoding="utf-8"))
-            for name, path in (("district_outlook_eval", DISTRICT_EVAL_PATH),
-                               ("era5_chirps_validation", VALIDATION_PATH),
-                               ("heat_metrics", HEAT_METRICS_PATH),
-                               ("dengue_backtest", DENGUE_RESULTS))
-            if path.exists()
-        }
         counts.update(sync_districts(
-            get_engine(),
+            engine,
             _read(DISTRICT_MONTHLY_PATH),
             json.loads(DISTRICT_GEOJSON_PATH.read_text(encoding="utf-8")),
-            docs,
         ))
     else:
         log.info("No district data; run `python -m climrisk districts` to build it")
+
+    docs = {"drought_explanations": explain_drought(bundle, feat)}
+    for name, path in (("district_outlook_eval", DISTRICT_EVAL_PATH),
+                       ("era5_chirps_validation", VALIDATION_PATH),
+                       ("heat_metrics", HEAT_METRICS_PATH),
+                       ("dengue_backtest", DENGUE_RESULTS)):
+        if path.exists():
+            docs[name] = json.loads(path.read_text(encoding="utf-8"))
+    counts["documents"] = publish_documents(engine, docs)
     return counts
 
 

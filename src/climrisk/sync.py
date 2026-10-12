@@ -167,11 +167,26 @@ def sync(
     return counts
 
 
+def publish_documents(engine: Engine, docs: dict[str, object]) -> int:
+    """Replace the named JSON documents (evaluations, explanations, geometry)."""
+    from .db import documents
+
+    if not docs:
+        return 0
+    create_schema(engine)
+    now = datetime.now(UTC)
+    rows = [{"name": k, "updated_at": now, "content": v} for k, v in docs.items()]
+    with engine.begin() as conn:
+        conn.execute(documents.delete().where(documents.c.name.in_(list(docs))))
+        conn.execute(documents.insert(), rows)
+    return len(rows)
+
+
 def sync_districts(
     engine: Engine, table: pd.DataFrame, geojson: dict, extra_docs: dict | None = None
 ) -> dict:
     """Publish the district drought monitor (see districts.py)."""
-    from .db import district_monthly, districts, documents
+    from .db import district_monthly, districts
 
     create_schema(engine)
     names = [
@@ -186,17 +201,13 @@ def sync_districts(
                                  "category", "drought_prob_next")},
     })
     rows = rows.astype(object).where(rows.notna(), None).to_dict(orient="records")
-    now = datetime.now(UTC)
-    docs = [{"name": "districts_geojson", "updated_at": now, "content": geojson}]
-    docs += [{"name": k, "updated_at": now, "content": v} for k, v in (extra_docs or {}).items()]
 
     with engine.begin() as conn:
         conn.execute(district_monthly.delete())
         conn.execute(districts.delete())
         conn.execute(districts.insert(), names)
         conn.execute(district_monthly.insert(), rows)
-        conn.execute(documents.delete().where(documents.c.name.in_([d["name"] for d in docs])))
-        conn.execute(documents.insert(), docs)
+    publish_documents(engine, {"districts_geojson": geojson, **(extra_docs or {})})
     counts = {"districts": len(names), "district_months": len(rows)}
     log.info("District sync: %s", counts)
     return counts

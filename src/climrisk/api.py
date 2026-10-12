@@ -11,12 +11,16 @@ and open http://127.0.0.1:8000/docs
 
 from __future__ import annotations
 
+import csv
+import io
 import os
 import re
-from datetime import date
+from datetime import UTC, date, datetime
+from email.utils import format_datetime
+from xml.sax.saxutils import escape
 
 import sqlalchemy as sa
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.engine import Connection
 
@@ -36,6 +40,7 @@ from .districts import CATEGORIES
 from .spi import classify
 
 MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
+WEB_URL = os.environ.get("WEB_URL", "http://localhost:3000").rstrip("/")
 
 app = FastAPI(
     title="Bangladesh Climate Risk API",
@@ -399,10 +404,129 @@ def heat_evaluation(conn: Connection = Depends(get_conn)) -> dict:
     return _document(conn, "heat_metrics")
 
 
+@app.get("/explain")
+def explain(city: str, conn: Connection = Depends(get_conn)) -> dict:
+    """Top drivers of a city's live drought probability ("what if this were typical?")."""
+    name = _city(conn, city)
+    data = _document(conn, "drought_explanations")
+    if name not in data:
+        raise HTTPException(404, f"no explanation for {name}")
+    head, *drivers = data[name]
+    return {"city": name, "probability": head["probability"], "drivers": drivers}
+
+
 @app.get("/dengue")
 def dengue_backtest(conn: Connection = Depends(get_conn)) -> dict:
     """Dengue one-month-ahead backtest by division (2024-2025 test), with the series."""
     return _document(conn, "dengue_backtest")
+
+
+def _csv(rows: list[dict], filename: str) -> Response:
+    buf = io.StringIO()
+    if rows:
+        writer = csv.DictWriter(buf, fieldnames=list(rows[0]))
+        writer.writeheader()
+        writer.writerows(rows)
+    return Response(
+        buf.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/export/forecasts.csv")
+def export_forecasts(city: str | None = None, conn: Connection = Depends(get_conn)) -> Response:
+    """Every stored forecast (validation, test, live) with its observed outcome, as CSV."""
+    q = _forecast_query(_active_version(conn))
+    if city:
+        q = q.where(forecasts.c.city == _city(conn, city))
+    rows = []
+    for r in conn.execute(q.order_by(forecasts.c.city, forecasts.c.target_month)):
+        m = dict(r._mapping)
+        for k in ("target_month", "issued_through"):
+            m[k] = m[k].strftime("%Y-%m")
+        rows.append(m)
+    return _csv(rows, f"forecasts{'_' + city.lower() if city else ''}.csv")
+
+
+@app.get("/export/districts.csv")
+def export_districts(
+    month: str | None = Query(None, description="YYYY-MM; default: all months"),
+    conn: Connection = Depends(get_conn),
+) -> Response:
+    """District drought monitor (rainfall, normal, SPI, category, outlook) as CSV."""
+    dm = district_monthly
+    q = sa.select(dm)
+    if (m := _month(month, "month")) is not None:
+        q = q.where(dm.c.month == m)
+    rows = []
+    for r in conn.execute(q.order_by(dm.c.district, dm.c.month)):
+        d = dict(r._mapping)
+        d["month"] = d["month"].strftime("%Y-%m")
+        rows.append(d)
+    return _csv(rows, f"districts{'_' + month if month else ''}.csv")
+
+
+@app.get("/alerts.rss", response_class=Response)
+def alerts(conn: Connection = Depends(get_conn)) -> Response:
+    """RSS feed of current warnings: elevated/high drought risk, notable heat-wave
+    outlooks, and districts in severe drought or worse. Subscribe in any feed reader."""
+    run = conn.execute(sa.select(model_runs).where(model_runs.c.is_active)).first()
+    published = run.created_at if run else datetime.now(UTC)
+    if published.tzinfo is None:
+        published = published.replace(tzinfo=UTC)
+    items = []
+    for f in latest(conn):
+        month = f["target_month"]
+        link = f"{WEB_URL}/city/{f['city'].lower()}"
+        d = f["drought"]
+        if d["risk_level"] in ("elevated", "high"):
+            items.append((
+                f"{d['risk_level'].capitalize()} drought risk: {f['city']}, {month}",
+                f"Chance that the 3 months ending {month} are in drought: "
+                f"{d['probability']:.0%} (usually {d['usual_probability']:.0%}). "
+                f"Expected rainfall {f['rainfall']['expected_mm']:.0f} mm "
+                f"(normal {f['rainfall']['normal_mm']:.0f} mm).",
+                link, f"drought-{f['city']}-{month}",
+            ))
+        h = f.get("heat")
+        if h and h["expected_days"] >= 5:
+            items.append((
+                f"Heat-wave outlook: {f['city']}, {month}",
+                f"About {h['expected_days']:.0f} days at or above 36 °C expected "
+                f"(normal {h['normal_days']:.0f}, recent decade {h['recent_decade_days']:.0f}).",
+                link, f"heat-{f['city']}-{month}",
+            ))
+    dm = district_monthly
+    last = conn.execute(sa.select(sa.func.max(dm.c.month))).scalar()
+    if last is not None:
+        severe = conn.execute(
+            sa.select(dm.c.district, dm.c.category, dm.c.drought_prob_next)
+            .where((dm.c.month == last) & dm.c.category.in_(["D2", "D3", "D4"]))
+            .order_by(dm.c.spi3)
+        ).all()
+        if severe:
+            names = ", ".join(f"{r.district} ({r.category})" for r in severe)
+            items.append((
+                f"{len(severe)} districts in severe drought or worse, {last:%Y-%m}",
+                f"US Drought Monitor categories from 3-month rainfall: {names}.",
+                f"{WEB_URL}/monitor", f"districts-{last:%Y-%m}",
+            ))
+    body = "".join(
+        f"<item><title>{escape(t)}</title><description>{escape(desc)}</description>"
+        f"<link>{escape(link)}</link><guid isPermaLink=\"false\">{escape(guid)}</guid>"
+        f"<pubDate>{format_datetime(published)}</pubDate></item>"
+        for t, desc, link, guid in items
+    )
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel>'
+        "<title>Bangladesh Climate Risk alerts</title>"
+        f"<link>{escape(WEB_URL)}</link>"
+        "<description>Drought, heat and district drought-monitor warnings. Research demo, "
+        "not an official forecast.</description>"
+        f"<lastBuildDate>{format_datetime(published)}</lastBuildDate>{body}</channel></rss>"
+    )
+    return Response(xml, media_type="application/rss+xml")
 
 
 @app.get("/metrics")

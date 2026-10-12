@@ -175,3 +175,37 @@ def test_issued_forecasts_are_frozen(engine, artefacts, client):
     assert after == first
     live = client.get("/forecast", params={"city": "Alpha", "month": "2025-01"}).json()
     assert live["drought"]["usual_probability"] == 0.42  # the live view did move on
+
+
+def test_explanations_and_document_publishing(engine, artefacts, client):
+    from climrisk.explain import explain_drought
+    from climrisk.sync import publish_documents
+
+    expl = explain_drought(artefacts["bundle"], artefacts["feat"])
+    assert set(expl) == {"Alpha", "Beta"}
+    head, *drivers = expl["Alpha"]
+    assert 0 <= head["probability"] <= 1 and 1 <= len(drivers) <= 4
+    effects = [abs(d["effect"]) for d in drivers]
+    assert effects == sorted(effects, reverse=True)
+
+    assert publish_documents(engine, {"drought_explanations": expl}) == 1
+    body = client.get("/explain", params={"city": "alpha"}).json()
+    assert body["city"] == "Alpha" and body["drivers"][0]["label"]
+    assert client.get("/explain", params={"city": "Atlantis"}).status_code == 404
+
+
+def test_alerts_feed_is_valid_rss(client):
+    import xml.dom.minidom
+
+    r = client.get("/alerts.rss")
+    assert r.status_code == 200 and r.headers["content-type"].startswith("application/rss+xml")
+    doc = xml.dom.minidom.parseString(r.text)
+    assert doc.getElementsByTagName("channel")
+
+
+def test_csv_exports(client):
+    r = client.get("/export/forecasts.csv", params={"city": "Beta"})
+    lines = r.text.strip().splitlines()
+    assert lines[0].startswith("model_version,city,target_month")
+    assert all(",Beta," in line for line in lines[1:])
+    assert "attachment" in r.headers["content-disposition"]
