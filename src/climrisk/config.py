@@ -67,6 +67,10 @@ INTERVAL_ALPHA = 0.2  # 80% prediction intervals
 
 RANDOM_STATE = 42
 
+# Add ENSO/IOD indices as features. Decided on the validation years by
+# `python -m climrisk experiment` (see reports/experiments.md).
+USE_CLIMATE_INDICES = False
+
 SEASONS = {
     12: "Winter (DJF)", 1: "Winter (DJF)", 2: "Winter (DJF)",
     3: "Pre-monsoon (MAM)", 4: "Pre-monsoon (MAM)", 5: "Pre-monsoon (MAM)",

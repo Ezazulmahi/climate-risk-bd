@@ -16,6 +16,7 @@ STEPS = {
     "evaluate": "score on the held-out test years, write reports/evaluation.md",
     "all": "run every step in order (ingest .. evaluate)",
     "db-sync": "publish observations, forecasts and metrics to DATABASE_URL",
+    "experiment": "compare the model with and without ENSO/IOD indices",
 }
 
 
@@ -34,6 +35,7 @@ def main(argv: list[str] | None = None) -> None:
         "ingest": lambda: pipeline.step_ingest(refresh),
         "update": pipeline.step_update,
         "db-sync": pipeline.step_db_sync,
+        "experiment": pipeline.step_experiment,
         "features": pipeline.step_features,
         "eda": pipeline.step_eda,
         "train": pipeline.step_train,

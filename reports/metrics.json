@@ -3,405 +3,411 @@
     "2020-01-01",
     "2026-09-01"
   ],
-  "n_test": 567,
-  "drought_rate_test": 0.23633156966490299,
+  "n_test": 648,
+  "drought_rate_test": 0.22993827160493827,
   "regression": {
     "climatology": {
-      "mae_mm": 70.75086923658353,
-      "rmse_mm": 111.97361653513211,
+      "mae_mm": 69.45267195767195,
+      "rmse_mm": 109.28036112052062,
       "mae_skill_vs_climatology": 0.0,
       "mse_skill_vs_climatology": 0.0
     },
     "ridge": {
-      "mae_mm": 70.33405126771238,
-      "rmse_mm": 111.37999739746748,
-      "mae_skill_vs_climatology": 0.005891347673444791,
-      "mse_skill_vs_climatology": 0.010574734368441918,
+      "mae_mm": 69.24160049050366,
+      "rmse_mm": 108.97108269108314,
+      "mae_skill_vs_climatology": 0.003039069069897482,
+      "mse_skill_vs_climatology": 0.005652264982591415,
       "mae_skill_95ci": [
-        -0.024509956664596173,
-        0.03926464899602168
+        -0.02939759964846389,
+        0.03909900355547258
       ]
     },
     "hgb": {
-      "mae_mm": 72.69060745659318,
-      "rmse_mm": 116.46762127560359,
-      "mae_skill_vs_climatology": -0.02741645778970403,
-      "mse_skill_vs_climatology": -0.08187977117251011,
+      "mae_mm": 70.66668473494258,
+      "rmse_mm": 113.64898446374194,
+      "mae_skill_vs_climatology": -0.017479713062882762,
+      "mse_skill_vs_climatology": -0.08155068253952336,
       "mae_skill_95ci": [
-        -0.06519929297582894,
-        0.021628965992664256
+        -0.05210953172610252,
+        0.027987140196043415
       ]
     }
   },
   "interval": {
     "nominal_coverage": 0.8,
-    "empirical_coverage": 0.7671957671957672,
-    "mean_width_mm": 199.22142486069623,
+    "empirical_coverage": 0.7592592592592593,
+    "mean_width_mm": 200.1842864524199,
     "coverage_by_season": {
       "Winter (DJF)": 0.8,
-      "Pre-monsoon (MAM)": 0.7482993197278912,
+      "Pre-monsoon (MAM)": 0.7202380952380952,
       "Monsoon (JJAS)": 0.7142857142857143,
-      "Post-monsoon (ON)": 0.8690476190476191
+      "Post-monsoon (ON)": 0.8645833333333334
     }
   },
   "classification": {
     "climatology": {
       "threshold": 0.5,
       "roc_auc": 0.5,
-      "pr_auc": 0.23633156966490299,
-      "brier": 0.1856292807609609,
+      "pr_auc": 0.22993827160493827,
+      "brier": 0.18146703891932592,
       "f1": 0.0,
       "precision": 0.0,
       "recall": 0.0,
       "confusion_matrix": [
         [
-          433,
+          499,
           0
         ],
         [
-          134,
+          149,
           0
         ]
       ],
       "brier_skill_vs_climatology": 0.0,
-      "brier_skill_vs_ensemble": -0.6497992051866825
+      "brier_skill_vs_ensemble": -0.6043719495924809
     },
     "ensemble": {
       "threshold": 0.35,
-      "roc_auc": 0.9110337458205509,
-      "pr_auc": 0.6900088664284293,
-      "brier": 0.11251628693805564,
-      "f1": 0.6590038314176245,
-      "precision": 0.6771653543307087,
-      "recall": 0.6417910447761194,
+      "roc_auc": 0.9051256876168444,
+      "pr_auc": 0.6743330771574358,
+      "brier": 0.11310783572688336,
+      "f1": 0.631578947368421,
+      "precision": 0.6617647058823529,
+      "recall": 0.6040268456375839,
       "confusion_matrix": [
         [
-          392,
-          41
+          453,
+          46
         ],
         [
-          48,
-          86
+          59,
+          90
         ]
       ],
-      "brier_skill_vs_climatology": 0.39386563112882256,
+      "brier_skill_vs_climatology": 0.3767031390358043,
       "brier_skill_vs_ensemble": 0.0
     },
     "logistic": {
-      "threshold": 0.36,
-      "roc_auc": 0.9086036331046845,
-      "pr_auc": 0.6950127653421144,
-      "brier": 0.11589646633552479,
-      "f1": 0.6360153256704981,
-      "precision": 0.6535433070866141,
-      "recall": 0.6194029850746269,
+      "threshold": 0.26,
+      "roc_auc": 0.9025164422805343,
+      "pr_auc": 0.6787744839787015,
+      "brier": 0.1176874271625308,
+      "f1": 0.656441717791411,
+      "precision": 0.6045197740112994,
+      "recall": 0.7181208053691275,
       "confusion_matrix": [
         [
-          389,
-          44
+          429,
+          70
         ],
         [
-          51,
-          83
+          42,
+          107
         ]
       ],
-      "brier_skill_vs_climatology": 0.3756563303999042,
-      "brier_skill_vs_ensemble": -0.030041689869574784
+      "brier_skill_vs_climatology": 0.35146664725790433,
+      "brier_skill_vs_ensemble": -0.040488719514584215
     },
     "hgb": {
-      "threshold": 0.41,
-      "roc_auc": 0.8971769328875254,
-      "pr_auc": 0.6718368958102756,
-      "brier": 0.11499981986758816,
-      "f1": 0.5863453815261044,
-      "precision": 0.6347826086956522,
-      "recall": 0.5447761194029851,
+      "threshold": 0.39,
+      "roc_auc": 0.8957915831663327,
+      "pr_auc": 0.67763653065856,
+      "brier": 0.11351540539343144,
+      "f1": 0.6137184115523465,
+      "precision": 0.6640625,
+      "recall": 0.5704697986577181,
       "confusion_matrix": [
         [
-          391,
-          42
+          456,
+          43
         ],
         [
-          61,
-          73
+          64,
+          85
         ]
       ],
-      "brier_skill_vs_climatology": 0.3804866376890397,
-      "brier_skill_vs_ensemble": -0.022072652743151622
+      "brier_skill_vs_climatology": 0.3744571682579968,
+      "brier_skill_vs_ensemble": -0.003603372515518899
     }
   },
   "error_by_season": [
     {
       "season": "Winter (DJF)",
-      "abs_err_hgb": 14.023,
-      "abs_err_clim": 14.61,
-      "skill": 0.04
+      "abs_err_hgb": 13.411,
+      "abs_err_clim": 14.552,
+      "skill": 0.078
     },
     {
       "season": "Pre-monsoon (MAM)",
-      "abs_err_hgb": 85.915,
-      "abs_err_clim": 86.19,
-      "skill": 0.003
+      "abs_err_hgb": 86.942,
+      "abs_err_clim": 86.022,
+      "skill": -0.011
     },
     {
       "season": "Monsoon (JJAS)",
-      "abs_err_hgb": 119.071,
-      "abs_err_clim": 113.98,
-      "skill": -0.045
+      "abs_err_hgb": 112.6,
+      "abs_err_clim": 108.463,
+      "skill": -0.038
     },
     {
       "season": "Post-monsoon (ON)",
-      "abs_err_hgb": 39.107,
-      "abs_err_clim": 36.433,
-      "skill": -0.073
+      "abs_err_hgb": 39.766,
+      "abs_err_clim": 40.935,
+      "skill": 0.029
     }
   ],
   "error_by_city": [
     {
       "city": "Barishal",
-      "abs_err_hgb": 58.49,
+      "abs_err_hgb": 58.945,
       "abs_err_clim": 57.205,
-      "skill": -0.022
+      "skill": -0.03
     },
     {
       "city": "Chattogram",
-      "abs_err_hgb": 84.406,
+      "abs_err_hgb": 85.444,
       "abs_err_clim": 84.303,
-      "skill": -0.001
+      "skill": -0.014
     },
     {
       "city": "Dhaka",
-      "abs_err_hgb": 63.019,
+      "abs_err_hgb": 62.247,
       "abs_err_clim": 59.33,
-      "skill": -0.062
+      "skill": -0.049
     },
     {
       "city": "Khulna",
-      "abs_err_hgb": 56.502,
+      "abs_err_hgb": 55.076,
       "abs_err_clim": 52.042,
-      "skill": -0.086
+      "skill": -0.058
+    },
+    {
+      "city": "Mymensingh",
+      "abs_err_hgb": 61.076,
+      "abs_err_clim": 60.365,
+      "skill": -0.012
     },
     {
       "city": "Rajshahi",
-      "abs_err_hgb": 43.296,
+      "abs_err_hgb": 44.781,
       "abs_err_clim": 43.167,
-      "skill": -0.003
+      "skill": -0.037
     },
     {
       "city": "Rangpur",
-      "abs_err_hgb": 65.264,
+      "abs_err_hgb": 63.429,
       "abs_err_clim": 60.816,
-      "skill": -0.073
+      "skill": -0.043
     },
     {
       "city": "Sylhet",
-      "abs_err_hgb": 137.858,
+      "abs_err_hgb": 134.336,
       "abs_err_clim": 138.394,
-      "skill": 0.004
+      "skill": 0.029
     }
   ],
   "largest_errors": [
-    {
-      "city": "Sylhet",
-      "target_date": "2021-05",
-      "target_precip_mm": 363.7,
-      "clim_precip_mean_next": 756.0,
-      "err_hgb": -667.0,
-      "predicted_mm": 1031.0
-    },
     {
       "city": "Chattogram",
       "target_date": "2024-08",
       "target_precip_mm": 1005.7,
       "clim_precip_mean_next": 429.0,
-      "err_hgb": 529.3,
-      "predicted_mm": 476.0
+      "err_hgb": 628.8,
+      "predicted_mm": 377.0
     },
     {
       "city": "Sylhet",
-      "target_date": "2024-06",
-      "target_precip_mm": 1312.8,
-      "clim_precip_mean_next": 955.3,
-      "err_hgb": 501.3,
-      "predicted_mm": 812.0
-    },
-    {
-      "city": "Sylhet",
-      "target_date": "2022-07",
-      "target_precip_mm": 424.5,
-      "clim_precip_mean_next": 949.0,
-      "err_hgb": -485.2,
-      "predicted_mm": 910.0
-    },
-    {
-      "city": "Chattogram",
-      "target_date": "2026-07",
-      "target_precip_mm": 984.7,
-      "clim_precip_mean_next": 559.5,
-      "err_hgb": 484.6,
-      "predicted_mm": 500.0
+      "target_date": "2021-05",
+      "target_precip_mm": 363.7,
+      "clim_precip_mean_next": 756.0,
+      "err_hgb": -590.7,
+      "predicted_mm": 954.0
     },
     {
       "city": "Sylhet",
       "target_date": "2023-05",
       "target_precip_mm": 326.0,
       "clim_precip_mean_next": 756.0,
-      "err_hgb": -444.7,
-      "predicted_mm": 771.0
+      "err_hgb": -502.8,
+      "predicted_mm": 829.0
     },
     {
       "city": "Sylhet",
-      "target_date": "2024-08",
-      "target_precip_mm": 1200.0,
-      "clim_precip_mean_next": 755.9,
-      "err_hgb": 444.3,
-      "predicted_mm": 756.0
-    },
-    {
-      "city": "Sylhet",
-      "target_date": "2022-08",
-      "target_precip_mm": 277.7,
-      "clim_precip_mean_next": 755.9,
-      "err_hgb": -439.8,
-      "predicted_mm": 717.0
+      "target_date": "2022-07",
+      "target_precip_mm": 424.5,
+      "clim_precip_mean_next": 949.0,
+      "err_hgb": -481.5,
+      "predicted_mm": 906.0
     },
     {
       "city": "Chattogram",
       "target_date": "2023-08",
       "target_precip_mm": 823.9,
       "clim_precip_mean_next": 429.0,
-      "err_hgb": 432.9,
-      "predicted_mm": 391.0
+      "err_hgb": 461.0,
+      "predicted_mm": 363.0
+    },
+    {
+      "city": "Sylhet",
+      "target_date": "2024-06",
+      "target_precip_mm": 1312.8,
+      "clim_precip_mean_next": 955.3,
+      "err_hgb": 448.1,
+      "predicted_mm": 865.0
     },
     {
       "city": "Chattogram",
-      "target_date": "2022-07",
-      "target_precip_mm": 182.2,
+      "target_date": "2026-07",
+      "target_precip_mm": 984.7,
       "clim_precip_mean_next": 559.5,
-      "err_hgb": -418.9,
-      "predicted_mm": 601.0
+      "err_hgb": 444.9,
+      "predicted_mm": 540.0
+    },
+    {
+      "city": "Sylhet",
+      "target_date": "2024-08",
+      "target_precip_mm": 1200.0,
+      "clim_precip_mean_next": 755.9,
+      "err_hgb": 438.8,
+      "predicted_mm": 761.0
+    },
+    {
+      "city": "Sylhet",
+      "target_date": "2022-08",
+      "target_precip_mm": 277.7,
+      "clim_precip_mean_next": 755.9,
+      "err_hgb": -423.8,
+      "predicted_mm": 702.0
+    },
+    {
+      "city": "Sylhet",
+      "target_date": "2021-04",
+      "target_precip_mm": 99.1,
+      "clim_precip_mean_next": 584.4,
+      "err_hgb": -408.5,
+      "predicted_mm": 508.0
     }
   ],
   "permutation_importance": [
     {
       "feature": "drought_prob_ens",
-      "regression": 0.0004,
-      "drought": 0.1148
-    },
-    {
-      "feature": "spi1",
-      "regression": -0.0045,
-      "drought": 0.0034
-    },
-    {
-      "feature": "precip_anom_z_lag1",
       "regression": 0.0028,
-      "drought": 0.0018
+      "drought": 0.1227
     },
     {
-      "feature": "precip_anom_z_roll6",
-      "regression": -0.0036,
-      "drought": 0.0014
-    },
-    {
-      "feature": "precip_anom_z_lag2",
-      "regression": -0.0036,
-      "drought": 0.0008
-    },
-    {
-      "feature": "precip_anom_z_lag11",
-      "regression": -0.0034,
-      "drought": 0.0007
-    },
-    {
-      "feature": "t2m_anom",
-      "regression": 0.0007,
-      "drought": 0.0007
-    },
-    {
-      "feature": "target_month_sin",
-      "regression": -0.0003,
-      "drought": 0.0005
-    },
-    {
-      "feature": "precip_anom_z_roll3",
-      "regression": 0.0013,
-      "drought": 0.0004
-    },
-    {
-      "feature": "ws10m",
-      "regression": 0.0003,
+      "feature": "target_month_cos",
+      "regression": -0.0015,
       "drought": 0.0002
     },
     {
-      "feature": "spi12",
-      "regression": -0.0037,
+      "feature": "precip_anom_z_lag2",
+      "regression": -0.0022,
+      "drought": 0.0001
+    },
+    {
+      "feature": "precip_anom_z",
+      "regression": 0.0013,
+      "drought": 0.0001
+    },
+    {
+      "feature": "spi1",
+      "regression": 0.0037,
+      "drought": 0.0001
+    },
+    {
+      "feature": "precip_anom_z_lag1",
+      "regression": 0.0027,
+      "drought": 0.0001
+    },
+    {
+      "feature": "precip_anom_z_lag11",
+      "regression": -0.0004,
       "drought": 0.0
     },
     {
-      "feature": "lat",
-      "regression": -0.0014,
+      "feature": "precip_anom_z_roll6",
+      "regression": -0.0071,
+      "drought": 0.0
+    },
+    {
+      "feature": "spi3",
+      "regression": 0.0018,
+      "drought": 0.0
+    },
+    {
+      "feature": "spi12",
+      "regression": -0.0077,
+      "drought": 0.0
+    },
+    {
+      "feature": "t2m_anom",
+      "regression": 0.0035,
+      "drought": 0.0
+    },
+    {
+      "feature": "precip_anom_z_roll3",
+      "regression": 0.004,
       "drought": 0.0
     },
     {
       "feature": "lon",
-      "regression": -0.0,
+      "regression": 0.0007,
+      "drought": 0.0
+    },
+    {
+      "feature": "rh2m_anom",
+      "regression": -0.0082,
+      "drought": 0.0
+    },
+    {
+      "feature": "lat",
+      "regression": -0.0005,
+      "drought": 0.0
+    },
+    {
+      "feature": "ws10m",
+      "regression": -0.0017,
       "drought": 0.0
     },
     {
       "feature": "spi6",
-      "regression": 0.0088,
+      "regression": 0.0032,
       "drought": -0.0
     },
     {
       "feature": "clim_precip_mean_next",
-      "regression": 0.0012,
-      "drought": -0.0001
-    },
-    {
-      "feature": "precip_anom_z",
-      "regression": -0.0019,
-      "drought": -0.0001
-    },
-    {
-      "feature": "target_month_cos",
-      "regression": -0.0129,
-      "drought": -0.0002
-    },
-    {
-      "feature": "rh2m_anom",
-      "regression": -0.0068,
-      "drought": -0.0004
-    },
-    {
-      "feature": "spi3",
-      "regression": -0.0076,
-      "drought": -0.0004
+      "regression": -0.0008,
+      "drought": -0.0
     },
     {
       "feature": "t2m_anom_roll3",
-      "regression": -0.0124,
-      "drought": -0.0028
+      "regression": -0.0123,
+      "drought": -0.0002
+    },
+    {
+      "feature": "target_month_sin",
+      "regression": -0.0043,
+      "drought": -0.0002
     }
   ],
   "validation": {
     "regression_mae_mm": {
-      "climatology": 67.75121598639456,
-      "ridge": 67.48947092662621,
-      "hgb": 65.67190452453464
+      "climatology": 67.8203050595238,
+      "ridge": 67.37604144934913,
+      "hgb": 66.2279638794604
     },
     "classification": {
       "climatology": {
-        "log_loss": 0.42156576067568463
+        "log_loss": 0.4166023975827353
       },
       "ensemble": {
-        "log_loss": 0.20838981980886717
+        "log_loss": 0.19898465693960024
       },
       "logistic": {
-        "log_loss": 0.2326988101738196
+        "log_loss": 0.2243177719626036
       },
       "hgb": {
-        "log_loss": 0.2055649255504038
+        "log_loss": 0.20154199458459757
       }
     }
   },
@@ -414,7 +420,7 @@
     "classification": {
       "learning_rate": 0.03,
       "max_depth": 2,
-      "max_iter": 400
+      "max_iter": 150
     }
   }
 }

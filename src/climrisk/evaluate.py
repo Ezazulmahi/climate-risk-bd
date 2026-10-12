@@ -74,7 +74,7 @@ def evaluate(
     reports_dir: Path = config.REPORTS_DIR,
     make_figures: bool = True,
 ) -> dict:
-    rows = modelling_rows(feat)
+    rows = modelling_rows(feat, bundle["feature_columns"])
     _, _, test = temporal_split(rows)
     test = test.copy()
     if test.empty:

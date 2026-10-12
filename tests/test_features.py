@@ -90,3 +90,31 @@ def test_ensemble_drought_prob_falls_as_known_rain_rises():
     p_wet = ensemble_drought_prob(wetter, 1981, 2015, -1.0)[-1]
     p_dry = ensemble_drought_prob(dryer, 1981, 2015, -1.0)[-1]
     assert p_dry > base[-1] > p_wet
+
+
+def test_climate_indices_are_aligned_to_publication():
+    from climrisk.indices import parse_dmi, parse_oni
+
+    oni = parse_oni(
+        " SEAS  YR   TOTAL   ANOM\n  JAS 2026  29.12   2.16\n  NDJ 2025  26.0  -0.50\n"
+    )
+    # A season is keyed by its last month; NDJ 2025 ends in January 2026.
+    assert oni[pd.Timestamp("2026-09-01")] == 2.16
+    assert oni[pd.Timestamp("2026-01-01")] == -0.5
+
+    dmi = parse_dmi(
+        " 2025 2026\n2026 0.1 0.2 0.3 0.4 0.5 -9999 -9999 -9999 -9999 -9999 -9999 -9999\n"
+    )
+    assert len(dmi) == 5 and dmi[pd.Timestamp("2026-05-01")] == 0.5
+
+
+def test_index_features_are_optional(monthly):
+    from climrisk.features import INDEX_FEATURES, feature_columns
+
+    feat = _features(monthly)
+    assert feature_columns(feat, use_indices=True) == FEATURE_COLUMNS  # none present
+    idx = pd.DataFrame({"date": monthly["date"].unique()})
+    idx["oni"], idx["dmi_lag4"] = 0.5, -0.1
+    with_idx = build_features(monthly, compute_climatology(monthly), indices=idx)
+    assert feature_columns(with_idx, use_indices=True) == FEATURE_COLUMNS + INDEX_FEATURES
+    assert feature_columns(with_idx, use_indices=False) == FEATURE_COLUMNS

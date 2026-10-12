@@ -38,7 +38,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from . import config
-from .features import CLF_TARGET, FEATURE_COLUMNS, REG_TARGET, modelling_rows, temporal_split
+from .features import CLF_TARGET, REG_TARGET, feature_columns, modelling_rows, temporal_split
 
 log = logging.getLogger(__name__)
 
@@ -96,13 +96,15 @@ def train(
     feat: pd.DataFrame,
     grid: dict[str, list] | None = None,
     alpha: float = config.INTERVAL_ALPHA,
+    use_indices: bool = config.USE_CLIMATE_INDICES,
 ) -> dict[str, Any]:
     """Fit every model and return a serializable bundle."""
     grid = grid or DEFAULT_GRID
-    rows = modelling_rows(feat)
+    cols = feature_columns(feat, use_indices)
+    rows = modelling_rows(feat, cols)
     tr, va, _ = temporal_split(rows)
     trva = pd.concat([tr, va])
-    X_tr, X_va, X_trva = tr[FEATURE_COLUMNS], va[FEATURE_COLUMNS], trva[FEATURE_COLUMNS]
+    X_tr, X_va, X_trva = tr[cols], va[cols], trva[cols]
     log.info("Train rows: %d, validation rows: %d", len(tr), len(va))
 
     # ---------- Regression ----------
@@ -170,7 +172,7 @@ def train(
     }
 
     return {
-        "feature_columns": FEATURE_COLUMNS,
+        "feature_columns": cols,
         "reg_models": reg_models,
         "reg_interval": {"lo": q_lo, "hi": q_hi, "margin": cqr_margin, "alpha": alpha},
         "clf_models": clf_models,

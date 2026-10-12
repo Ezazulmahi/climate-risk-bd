@@ -36,6 +36,10 @@ FEATURE_COLUMNS: list[str] = [
     "lon",
 ]
 
+# Large-scale climate indices (see indices.py). Optional: used when present in the table
+# and enabled, so the effect of adding them can be measured.
+INDEX_FEATURES: list[str] = ["oni", "dmi_lag4"]
+
 REG_TARGET = "target_anom_z"  # standardized anomaly; converted back to mm for evaluation
 CLF_TARGET = "target_drought"
 
@@ -94,8 +98,11 @@ def build_features(
     ref_start: int = config.REF_START,
     ref_end: int = config.REF_END,
     drought_threshold: float = config.DROUGHT_THRESHOLD,
+    indices: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     d = clean_df.merge(clim, on=["city", "month"], how="left", validate="many_to_one")
+    if indices is not None:
+        d = d.merge(indices, on="date", how="left", validate="many_to_one")
     d = d.sort_values(["city", "date"]).reset_index(drop=True)
 
     d["precip_anom"] = d["precip_mm"] - d["clim_precip_mean"]
@@ -149,9 +156,16 @@ def build_features(
     return d
 
 
-def modelling_rows(feat: pd.DataFrame) -> pd.DataFrame:
+def feature_columns(
+    feat: pd.DataFrame, use_indices: bool = config.USE_CLIMATE_INDICES
+) -> list[str]:
+    extra = [c for c in INDEX_FEATURES if use_indices and c in feat.columns]
+    return FEATURE_COLUMNS + extra
+
+
+def modelling_rows(feat: pd.DataFrame, columns: list[str] | None = None) -> pd.DataFrame:
     """Rows usable for training/evaluation: complete features and known targets."""
-    needed = FEATURE_COLUMNS + [REG_TARGET, CLF_TARGET, "target_precip_mm"]
+    needed = (columns or FEATURE_COLUMNS) + [REG_TARGET, CLF_TARGET, "target_precip_mm"]
     return feat.dropna(subset=needed).reset_index(drop=True)
 
 

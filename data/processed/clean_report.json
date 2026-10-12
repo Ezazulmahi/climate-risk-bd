@@ -1,5 +1,5 @@
 {
-  "rows_in": 3843,
+  "rows_in": 4392,
   "missing_in": {
     "precip_mm": 0,
     "t2m": 0,
@@ -21,12 +21,10 @@
   "trailing_months_trimmed": 0,
   "covariate_values_interpolated": 0,
   "precip_missing_after_clean": 0,
-  "rows_out": 3843,
+  "rows_out": 4392,
   "period": [
     "1981-01",
     "2026-09"
   ],
-  "cities_missing": [
-    "Mymensingh"
-  ]
+  "cities_missing": []
 }

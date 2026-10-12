@@ -48,9 +48,16 @@ def step_update() -> None:
 
 
 def step_features() -> None:
+    from .indices import load_indices
+
     df = _read(config.CLEAN_PATH)
     clim = compute_climatology(df)
-    feat = build_features(df, clim)
+    try:
+        indices = load_indices()
+    except Exception as exc:  # the model still works without them
+        log.warning("Climate indices unavailable (%s); continuing without", exc)
+        indices = None
+    feat = build_features(df, clim, indices=indices)
     feat.to_csv(config.FEATURES_PATH, index=False)
     log.info("Features: %d rows -> %s", len(feat), config.FEATURES_PATH)
 
@@ -87,6 +94,12 @@ def step_db_sync() -> dict:
     bundle = joblib.load(config.BUNDLE_PATH)
     metrics = json.loads(config.METRICS_PATH.read_text()) if config.METRICS_PATH.exists() else None
     return sync(get_engine(), feat, bundle, metrics)
+
+
+def step_experiment() -> dict:
+    from .experiments import compare_indices
+
+    return compare_indices(_read(config.FEATURES_PATH))
 
 
 def run_all(refresh: bool = False) -> None:
