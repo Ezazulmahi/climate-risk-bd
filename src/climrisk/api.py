@@ -399,6 +399,12 @@ def heat_evaluation(conn: Connection = Depends(get_conn)) -> dict:
     return _document(conn, "heat_metrics")
 
 
+@app.get("/dengue")
+def dengue_backtest(conn: Connection = Depends(get_conn)) -> dict:
+    """Dengue one-month-ahead backtest by division (2024-2025 test), with the series."""
+    return _document(conn, "dengue_backtest")
+
+
 @app.get("/metrics")
 def metrics(conn: Connection = Depends(get_conn)) -> dict:
     """Full held-out evaluation of the active model (see reports/evaluation.md)."""

@@ -93,6 +93,7 @@ def step_db_sync() -> dict:
     feat = _read(config.FEATURES_PATH)
     bundle = joblib.load(config.BUNDLE_PATH)
     metrics = json.loads(config.METRICS_PATH.read_text()) if config.METRICS_PATH.exists() else None
+    from .dengue import DENGUE_RESULTS
     from .heat import HEAT_BUNDLE_PATH, HEAT_METRICS_PATH
     from .sync import heat_table
 
@@ -109,7 +110,8 @@ def step_db_sync() -> dict:
             name: json.loads(path.read_text(encoding="utf-8"))
             for name, path in (("district_outlook_eval", DISTRICT_EVAL_PATH),
                                ("era5_chirps_validation", VALIDATION_PATH),
-                               ("heat_metrics", HEAT_METRICS_PATH))
+                               ("heat_metrics", HEAT_METRICS_PATH),
+                               ("dengue_backtest", DENGUE_RESULTS))
             if path.exists()
         }
         counts.update(sync_districts(
@@ -127,6 +129,12 @@ def step_heat() -> dict:
     from .heat import run
 
     return run(_read(config.FEATURES_PATH))[1]
+
+
+def step_dengue() -> dict:
+    from .dengue import run
+
+    return run(_read(config.CLEAN_PATH))
 
 
 def step_districts(refresh: bool = False) -> None:

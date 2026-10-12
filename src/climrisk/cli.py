@@ -19,6 +19,7 @@ STEPS = {
     "experiment": "compare the model with and without ENSO/IOD indices",
     "districts": "64-district drought monitor from CHIRPS, and the ERA5 check",
     "heat": "train and evaluate the heat-wave-days outlook",
+    "dengue": "one-month-ahead dengue backtest by division (2020-2025 data)",
 }
 
 
@@ -40,6 +41,7 @@ def main(argv: list[str] | None = None) -> None:
         "experiment": pipeline.step_experiment,
         "districts": lambda: pipeline.step_districts(refresh),
         "heat": pipeline.step_heat,
+        "dengue": pipeline.step_dengue,
         "features": pipeline.step_features,
         "eda": pipeline.step_eda,
         "train": pipeline.step_train,
