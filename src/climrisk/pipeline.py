@@ -88,12 +88,40 @@ def step_evaluate() -> dict:
 
 def step_db_sync() -> dict:
     from .db import get_engine  # imported lazily so the offline pipeline needs no database
-    from .sync import sync
+    from .sync import sync, sync_districts
 
     feat = _read(config.FEATURES_PATH)
     bundle = joblib.load(config.BUNDLE_PATH)
     metrics = json.loads(config.METRICS_PATH.read_text()) if config.METRICS_PATH.exists() else None
-    return sync(get_engine(), feat, bundle, metrics)
+    counts = sync(get_engine(), feat, bundle, metrics)
+
+    from .districts import DISTRICT_EVAL_PATH, DISTRICT_GEOJSON_PATH, DISTRICT_MONTHLY_PATH
+    from .validation import VALIDATION_PATH
+
+    if DISTRICT_MONTHLY_PATH.exists():
+        docs = {
+            name: json.loads(path.read_text(encoding="utf-8"))
+            for name, path in (("district_outlook_eval", DISTRICT_EVAL_PATH),
+                               ("era5_chirps_validation", VALIDATION_PATH))
+            if path.exists()
+        }
+        counts.update(sync_districts(
+            get_engine(),
+            _read(DISTRICT_MONTHLY_PATH),
+            json.loads(DISTRICT_GEOJSON_PATH.read_text(encoding="utf-8")),
+            docs,
+        ))
+    else:
+        log.info("No district data; run `python -m climrisk districts` to build it")
+    return counts
+
+
+def step_districts(refresh: bool = False) -> None:
+    """64-district drought monitor from CHIRPS, plus the ERA5-vs-CHIRPS check."""
+    from . import districts, validation
+
+    result = districts.build(refresh=refresh)
+    validation.write_report(_read(config.CLEAN_PATH), result["chirps"])
 
 
 def step_experiment() -> dict:

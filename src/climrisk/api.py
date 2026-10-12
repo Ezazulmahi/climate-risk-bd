@@ -21,7 +21,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.engine import Connection
 
 from . import __version__
-from .db import cities, forecasts, get_engine, model_runs, observations
+from .db import (
+    cities,
+    district_monthly,
+    districts,
+    documents,
+    forecasts,
+    get_engine,
+    issued_forecasts,
+    model_runs,
+    observations,
+)
+from .districts import CATEGORIES
 from .spi import classify
 
 MONTH_RE = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
@@ -239,6 +250,132 @@ def verification(
         "drought_brier": round(brier, 4),
         "drought_brier_skill": round(1 - brier / brier_base, 4) if brier_base else None,
     }
+
+
+@app.get("/issued")
+def issued(city: str | None = None, conn: Connection = Depends(get_conn)) -> list[dict]:
+    """The append-only forecast log: each live forecast exactly as first published,
+    with the observed outcome once it is known. Retraining never changes these rows."""
+    i, o = issued_forecasts, observations
+    q = sa.select(
+        i, o.c.precip_mm.label("observed_mm"), o.c.spi3.label("observed_spi3")
+    ).select_from(
+        i.outerjoin(o, (o.c.city == i.c.city) & (o.c.month == i.c.target_month))
+    )
+    if city:
+        q = q.where(i.c.city == _city(conn, city))
+    out = []
+    for r in conn.execute(q.order_by(i.c.target_month.desc(), i.c.city)):
+        m = r._mapping
+        observed = None
+        if m["observed_mm"] is not None:
+            observed = {
+                "precip_mm": m["observed_mm"],
+                "spi3": m["observed_spi3"],
+                "inside_interval": m["lower_mm"] <= m["observed_mm"] <= m["upper_mm"],
+                "drought": m["observed_spi3"] is not None and m["observed_spi3"] <= -1.0,
+            }
+        out.append({
+            "city": m["city"],
+            "target_month": m["target_month"].strftime("%Y-%m"),
+            "issued_at": m["issued_at"].isoformat(),
+            "issued_through": m["issued_through"].strftime("%Y-%m"),
+            "model_version": m["model_version"],
+            "rainfall": {"expected_mm": m["expected_mm"],
+                         "interval_80_mm": [m["lower_mm"], m["upper_mm"]],
+                         "normal_mm": m["normal_mm"]},
+            "drought": {"probability": m["drought_prob"],
+                        "usual_probability": m["drought_base_rate"],
+                        "risk_level": m["risk_level"]},
+            "observed": observed,
+        })
+    return out
+
+
+def _document(conn: Connection, name: str):
+    content = conn.execute(
+        sa.select(documents.c.content).where(documents.c.name == name)
+    ).scalar_one_or_none()
+    if content is None:
+        raise HTTPException(404, f"{name} not published; run `climrisk districts` then db-sync")
+    return content
+
+
+def _district(conn: Connection, name: str) -> str:
+    found = conn.execute(
+        sa.select(districts.c.name).where(sa.func.lower(districts.c.name) == name.strip().lower())
+    ).scalar_one_or_none()
+    if found is None:
+        raise HTTPException(404, f"unknown district '{name}'; see /districts")
+    return found
+
+
+@app.get("/districts")
+def district_status(
+    month: str | None = Query(None, description="YYYY-MM; default: latest available"),
+    conn: Connection = Depends(get_conn),
+) -> dict:
+    """Drought monitor for all 64 districts in one month, with next month's outlook."""
+    dm = district_monthly
+    target = _month(month, "month") or conn.execute(sa.select(sa.func.max(dm.c.month))).scalar()
+    if target is None:
+        raise HTTPException(404, "district monitor not published")
+    rows = conn.execute(
+        sa.select(dm, districts.c.lat, districts.c.lon)
+        .join(districts, districts.c.name == dm.c.district)
+        .where(dm.c.month == target)
+        .order_by(dm.c.spi3)
+    )
+    out = []
+    for r in rows:
+        d = dict(r._mapping)
+        d["month"] = d["month"].strftime("%Y-%m")
+        out.append(d)
+    if not out:
+        raise HTTPException(404, f"no district data for {month}")
+    return {
+        "month": target.strftime("%Y-%m"),
+        "categories": [{"code": c, "label": label, "spi_at_or_below": ub}
+                       for ub, c, label in CATEGORIES],
+        "districts": out,
+    }
+
+
+@app.get("/districts/geojson")
+def district_geojson(conn: Connection = Depends(get_conn)) -> dict:
+    """Simplified district polygons (geoBoundaries ADM2, BBS/OCHA, CC BY 3.0 IGO)."""
+    return _document(conn, "districts_geojson")
+
+
+@app.get("/districts/evaluation")
+def district_evaluation(conn: Connection = Depends(get_conn)) -> dict:
+    """How the district drought outlook scored on the test years."""
+    return _document(conn, "district_outlook_eval")
+
+
+@app.get("/districts/{name}")
+def district_history(
+    name: str,
+    start: str | None = Query(None, description="YYYY-MM"),
+    conn: Connection = Depends(get_conn),
+) -> list[dict]:
+    district = _district(conn, name)
+    dm = district_monthly
+    q = sa.select(dm).where(dm.c.district == district)
+    if (s := _month(start, "start")) is not None:
+        q = q.where(dm.c.month >= s)
+    out = []
+    for r in conn.execute(q.order_by(dm.c.month)):
+        d = dict(r._mapping)
+        d["month"] = d["month"].strftime("%Y-%m")
+        out.append(d)
+    return out
+
+
+@app.get("/validation")
+def data_validation(conn: Connection = Depends(get_conn)) -> list[dict]:
+    """Agreement between ERA5 (city model) and CHIRPS (satellite + gauges) at each city."""
+    return _document(conn, "era5_chirps_validation")
 
 
 @app.get("/metrics")

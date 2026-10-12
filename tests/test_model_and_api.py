@@ -159,3 +159,19 @@ def test_verification_matches_offline_evaluation(client, artefacts):
 def test_metrics_endpoint(client):
     body = client.get("/metrics").json()
     assert "regression" in body and body["model_version"].startswith("v2015-")
+
+
+def test_issued_forecasts_are_frozen(engine, artefacts, client):
+    """A retrained model must not rewrite a forecast that was already published."""
+    first = client.get("/issued", params={"city": "Alpha"}).json()
+    assert [r["target_month"] for r in first] == ["2025-01"]
+
+    retrained = dict(artefacts["bundle"])
+    retrained["clf_base_rate"] = 0.42  # different model -> different version and numbers
+    retrained["validation"] = {**retrained["validation"], "note": "retrained"}
+    sync(engine, artefacts["feat"], retrained, artefacts["metrics"])
+
+    after = client.get("/issued", params={"city": "Alpha"}).json()
+    assert after == first
+    live = client.get("/forecast", params={"city": "Alpha", "month": "2025-01"}).json()
+    assert live["drought"]["usual_probability"] == 0.42  # the live view did move on

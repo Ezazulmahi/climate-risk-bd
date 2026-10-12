@@ -17,6 +17,7 @@ STEPS = {
     "all": "run every step in order (ingest .. evaluate)",
     "db-sync": "publish observations, forecasts and metrics to DATABASE_URL",
     "experiment": "compare the model with and without ENSO/IOD indices",
+    "districts": "64-district drought monitor from CHIRPS, and the ERA5 check",
 }
 
 
@@ -25,7 +26,7 @@ def main(argv: list[str] | None = None) -> None:
     sub = parser.add_subparsers(dest="step", required=True)
     for name, help_text in STEPS.items():
         p = sub.add_parser(name, help=help_text)
-        if name in ("ingest", "all"):
+        if name in ("ingest", "all", "districts"):
             p.add_argument("--refresh", action="store_true", help="ignore the download cache")
     args = parser.parse_args(argv)
 
@@ -36,6 +37,7 @@ def main(argv: list[str] | None = None) -> None:
         "update": pipeline.step_update,
         "db-sync": pipeline.step_db_sync,
         "experiment": pipeline.step_experiment,
+        "districts": lambda: pipeline.step_districts(refresh),
         "features": pipeline.step_features,
         "eda": pipeline.step_eda,
         "train": pipeline.step_train,

@@ -8,6 +8,10 @@ tests use SQLite. Tables:
 - ``forecasts``     every forecast issued by a model version: validation and test
                     hindcasts plus the live forecast, so accuracy can be verified
 - ``model_runs``    one row per model version with its test metrics
+- ``districts``, ``district_monthly`` the 64-district drought monitor (CHIRPS)
+- ``documents``     small JSON documents (district polygons, evaluations)
+- ``issued_forecasts`` append-only log: each live forecast exactly as first
+                    published. Never updated, so later retraining cannot rewrite it
 """
 
 from __future__ import annotations
@@ -59,6 +63,55 @@ forecasts = sa.Table(
     sa.Column("drought_base_rate", sa.Float, nullable=False),
     sa.Column("risk_level", sa.String(16), nullable=False),
     sa.Index("ix_forecasts_city_month", "city", "target_month"),
+)
+
+issued_forecasts = sa.Table(
+    "issued_forecasts",
+    metadata,
+    sa.Column("city", sa.String(64), sa.ForeignKey("cities.name"), primary_key=True),
+    sa.Column("target_month", sa.Date, primary_key=True),
+    sa.Column("issued_at", sa.DateTime(timezone=True), nullable=False),
+    sa.Column("issued_through", sa.Date, nullable=False),
+    sa.Column("model_version", sa.String(64), nullable=False),
+    sa.Column("expected_mm", sa.Float, nullable=False),
+    sa.Column("lower_mm", sa.Float, nullable=False),
+    sa.Column("upper_mm", sa.Float, nullable=False),
+    sa.Column("normal_mm", sa.Float, nullable=False),
+    sa.Column("drought_prob", sa.Float, nullable=False),
+    sa.Column("drought_base_rate", sa.Float, nullable=False),
+    sa.Column("risk_level", sa.String(16), nullable=False),
+)
+
+districts = sa.Table(
+    "districts",
+    metadata,
+    sa.Column("name", sa.String(64), primary_key=True),
+    sa.Column("lat", sa.Float, nullable=False),
+    sa.Column("lon", sa.Float, nullable=False),
+)
+
+district_monthly = sa.Table(
+    "district_monthly",
+    metadata,
+    sa.Column("district", sa.String(64), sa.ForeignKey("districts.name"), primary_key=True),
+    sa.Column("month", sa.Date, primary_key=True),
+    sa.Column("precip_mm", sa.Float),
+    sa.Column("normal_mm", sa.Float),
+    sa.Column("spi1", sa.Float),
+    sa.Column("spi3", sa.Float),
+    sa.Column("spi6", sa.Float),
+    sa.Column("spi12", sa.Float),
+    sa.Column("category", sa.String(4)),  # US Drought Monitor class D0..D4, NULL = none
+    sa.Column("drought_prob_next", sa.Float),
+)
+
+# Small JSON documents: district geometry, outlook evaluation, data validation.
+documents = sa.Table(
+    "documents",
+    metadata,
+    sa.Column("name", sa.String(64), primary_key=True),
+    sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+    sa.Column("content", sa.JSON, nullable=False),
 )
 
 model_runs = sa.Table(

@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from sqlalchemy.engine import Engine
 
 from . import config
-from .db import cities, create_schema, forecasts, model_runs, observations
+from .db import cities, create_schema, forecasts, issued_forecasts, model_runs, observations
 from .predict import risk_level
 from .train import predict_drought_proba, predict_regression
 
@@ -119,7 +119,53 @@ def sync(engine: Engine, feat: pd.DataFrame, bundle: dict, metrics: dict | None)
         if fc_rows:
             conn.execute(forecasts.insert(), fc_rows)
 
+        # Freeze live forecasts the first time they are published; never overwrite.
+        i = issued_forecasts.c
+        frozen = {(r.city, r.target_month) for r in conn.execute(sa.select(i.city, i.target_month))}
+        new_issues = [
+            {k: v for k, v in r.items() if k != "split"} | {"issued_at": run["created_at"]}
+            for r in fc_rows
+            if r["split"] == "live" and (r["city"], r["target_month"]) not in frozen
+        ]
+        if new_issues:
+            conn.execute(issued_forecasts.insert(), new_issues)
+
     counts = {"version": version, "cities": len(city_rows), "observations": len(obs_rows),
-              "forecasts": len(fc_rows)}
+              "forecasts": len(fc_rows), "newly_issued": len(new_issues)}
     log.info("Database sync: %s", counts)
+    return counts
+
+
+def sync_districts(
+    engine: Engine, table: pd.DataFrame, geojson: dict, extra_docs: dict | None = None
+) -> dict:
+    """Publish the district drought monitor (see districts.py)."""
+    from .db import district_monthly, districts, documents
+
+    create_schema(engine)
+    names = [
+        {"name": f["properties"]["name"], "lat": f["properties"]["lat"],
+         "lon": f["properties"]["lon"]}
+        for f in geojson["features"]
+    ]
+    rows = pd.DataFrame({
+        "district": table["district"],
+        "month": table["date"].dt.date,
+        **{c: table[c] for c in ("precip_mm", "normal_mm", "spi1", "spi3", "spi6", "spi12",
+                                 "category", "drought_prob_next")},
+    })
+    rows = rows.astype(object).where(rows.notna(), None).to_dict(orient="records")
+    now = datetime.now(UTC)
+    docs = [{"name": "districts_geojson", "updated_at": now, "content": geojson}]
+    docs += [{"name": k, "updated_at": now, "content": v} for k, v in (extra_docs or {}).items()]
+
+    with engine.begin() as conn:
+        conn.execute(district_monthly.delete())
+        conn.execute(districts.delete())
+        conn.execute(districts.insert(), names)
+        conn.execute(district_monthly.insert(), rows)
+        conn.execute(documents.delete().where(documents.c.name.in_([d["name"] for d in docs])))
+        conn.execute(documents.insert(), docs)
+    counts = {"districts": len(names), "district_months": len(rows)}
+    log.info("District sync: %s", counts)
     return counts
