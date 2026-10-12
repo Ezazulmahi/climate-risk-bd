@@ -124,6 +124,12 @@ def step_db_sync() -> dict:
     return counts
 
 
+def step_experiment_lstm() -> dict:
+    from .lstm import run_experiment
+
+    return run_experiment(_read(config.FEATURES_PATH))
+
+
 def step_heat() -> dict:
     from .heat import run
 
