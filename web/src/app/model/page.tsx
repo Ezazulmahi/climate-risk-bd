@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Card, ErrorPanel } from "@/components/ui";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type DistrictEval, type HeatEval, type ValidationRow } from "@/lib/api";
+import { getDict } from "@/lib/i18n";
 import { pct, signedPct } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -14,10 +15,21 @@ const CLF_NAMES = {
   hgb: "Gradient boosting",
 };
 
+const REPO = "https://github.com/Ezazulmahi/climate-risk-bd/blob/main/reports";
+
 export default async function ModelPage() {
+  const { t } = await getDict();
   let m;
+  let validation: ValidationRow[] | null = null;
+  let heat: HeatEval | null = null;
+  let districtEval: DistrictEval | null = null;
   try {
-    m = await api.metrics();
+    [m, validation, heat, districtEval] = await Promise.all([
+      api.metrics(),
+      api.validation().catch(() => null),
+      api.heatEval().catch(() => null),
+      api.districtEval().catch(() => null),
+    ]);
   } catch (e) {
     return <ErrorPanel message={e instanceof ApiError ? e.message : String(e)} />;
   }
@@ -27,7 +39,7 @@ export default async function ModelPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Model &amp; accuracy</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">{t.modelTitle}</h1>
         <p className="mt-2 max-w-3xl text-ink-2">
           Trained on 1982–2015, tuned on 2016–2019, and scored once on{" "}
           {m.test_period[0].slice(0, 7)} to {m.test_period[1].slice(0, 7)} ({m.n_test.toLocaleString()}{" "}
@@ -170,6 +182,91 @@ export default async function ModelPage() {
             </tbody>
           </table>
         </div>
+      </Card>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        {districtEval && (
+          <Card>
+            <h2 className="font-semibold">64-district drought outlook</h2>
+            <p className="mt-1 text-sm text-ink-2">
+              Climatological-ensemble outlook from CHIRPS rainfall, scored on{" "}
+              {districtEval.n_test.toLocaleString()} test district-months.
+            </p>
+            <dl className="mt-3 space-y-1 text-sm tabular">
+              <div className="flex flex-wrap justify-between gap-x-4"><dt className="text-ink-2">Brier skill vs usual rate</dt><dd>{signedPct(districtEval.brier_skill)}</dd></div>
+              <div className="flex flex-wrap justify-between gap-x-4"><dt className="text-ink-2">Drought months, training years</dt><dd>{pct(districtEval.base_rate_train, 1)}</dd></div>
+              <div className="flex flex-wrap justify-between gap-x-4"><dt className="text-ink-2">Drought months, test years</dt><dd>{pct(districtEval.drought_rate_test, 1)}</dd></div>
+            </dl>
+          </Card>
+        )}
+        {heat && (
+          <Card>
+            <h2 className="font-semibold">Heat-wave outlook (days ≥ 36 °C)</h2>
+            <p className="mt-1 text-sm text-ink-2">
+              Hot-season test months: {heat.n_test}. Observed {heat.mean_observed_days.toFixed(1)} days on
+              average vs a 1981–2015 normal of {heat.mean_normal_days.toFixed(1)}.
+            </p>
+            <dl className="mt-3 space-y-1 text-sm tabular">
+              <div className="flex flex-wrap justify-between gap-x-4"><dt className="text-ink-2">MAE: normal / last decade / model</dt><dd>{heat.mae_days.normal.toFixed(2)} / {heat.mae_days.recent.toFixed(2)} / {heat.mae_days.model.toFixed(2)} days</dd></div>
+              <div className="flex flex-wrap justify-between gap-x-4"><dt className="text-ink-2">Model vs last decade</dt><dd>{signedPct(heat.skill_vs_recent)} (95% CI {signedPct(heat.skill_vs_recent_95ci[0])} to {signedPct(heat.skill_vs_recent_95ci[1])})</dd></div>
+            </dl>
+          </Card>
+        )}
+      </div>
+
+      {validation && (
+        <Card>
+          <h2 className="font-semibold">Is ERA5 rainfall trustworthy? A check against CHIRPS</h2>
+          <p className="mt-1 text-sm text-ink-2">
+            CHIRPS blends satellite estimates with rain gauges. Anomaly and SPI-3 agreement matter most,
+            because forecasts depend on unusual months. Cohen&apos;s κ corrects drought agreement for
+            chance (0.4–0.6 is moderate).
+          </p>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr>
+                  <th className={th}>City</th>
+                  <th className={th}>ERA5 / CHIRPS total</th>
+                  <th className={th}>Anomaly corr.</th>
+                  <th className={th}>SPI-3 corr.</th>
+                  <th className={th}>Drought κ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {validation.map((v) => (
+                  <tr key={v.city} className="border-t border-line">
+                    <td className="py-2 pr-4">{v.city}</td>
+                    <td className={td}>{v.era5_over_chirps_total.toFixed(2)}</td>
+                    <td className={td}>{v.anomaly_corr.toFixed(2)}</td>
+                    <td className={td}>{v.spi3_corr.toFixed(2)}</td>
+                    <td className={td}>{v.drought_kappa.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      <Card>
+        <h2 className="font-semibold">Experiments</h2>
+        <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-ink-2">
+          <li>
+            <a className="text-accent underline" href={`${REPO}/experiment_climate_indices.md`} target="_blank" rel="noreferrer">ENSO and Indian Ocean Dipole indices</a>:
+            no gain on the validation years, so they are off; the test years look better with them,
+            reported but not acted on.
+          </li>
+          <li>
+            <a className="text-accent underline" href={`${REPO}/experiment_lstm.md`} target="_blank" rel="noreferrer">LSTM sequence model</a>:
+            a small, seed-consistent rainfall gain; no drought gain over the ensemble.
+          </li>
+          <li>
+            <a className="text-accent underline" href={`${REPO}/data_source_check.md`} target="_blank" rel="noreferrer">NASA POWER audit</a>{" "}
+            and{" "}
+            <a className="text-accent underline" href={`${REPO}/dengue_evaluation.md`} target="_blank" rel="noreferrer">dengue backtest</a>.
+          </li>
+        </ul>
       </Card>
 
       <Card>

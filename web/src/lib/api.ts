@@ -18,14 +18,121 @@ export interface Forecast {
     anomaly_mm: number;
   };
   drought: { probability: number; usual_probability: number; risk_level: RiskLevel };
+  heat: null | {
+    expected_days: number;
+    normal_days: number;
+    recent_decade_days: number;
+    threshold_c: number;
+  };
   observed: null | {
     precip_mm: number;
     spi3: number | null;
     spi3_category: string;
     drought: boolean;
     inside_interval: boolean;
+    heatwave_days: number | null;
   };
   model_version: string;
+}
+
+export interface Issued {
+  city: string;
+  target_month: string;
+  issued_at: string;
+  issued_through: string;
+  model_version: string;
+  rainfall: { expected_mm: number; interval_80_mm: [number, number]; normal_mm: number };
+  drought: { probability: number; usual_probability: number; risk_level: RiskLevel };
+  observed: null | {
+    precip_mm: number;
+    spi3: number | null;
+    inside_interval: boolean;
+    drought: boolean;
+  };
+}
+
+export interface Driver {
+  label: string;
+  features: string[];
+  effect: number;
+  value: number | null;
+  typical: number;
+}
+
+export interface Explanation {
+  city: string;
+  probability: number;
+  drivers: Driver[];
+}
+
+export interface DistrictRow {
+  district: string;
+  month: string;
+  precip_mm: number | null;
+  normal_mm: number | null;
+  spi1: number | null;
+  spi3: number | null;
+  spi6: number | null;
+  spi12: number | null;
+  category: "D0" | "D1" | "D2" | "D3" | "D4" | null;
+  drought_prob_next: number | null;
+  lat?: number;
+  lon?: number;
+}
+
+export interface DistrictStatus {
+  month: string;
+  categories: { code: string; label: string; spi_at_or_below: number }[];
+  districts: DistrictRow[];
+}
+
+export interface DistrictEval {
+  n_test: number;
+  base_rate_train: number;
+  drought_rate_test: number;
+  brier: number;
+  brier_base_rate: number;
+  brier_skill: number;
+}
+
+export interface HeatEval {
+  n_test: number;
+  mean_observed_days: number;
+  mean_normal_days: number;
+  mae_days: { normal: number; recent: number; model: number };
+  skill_vs_normal: number;
+  skill_vs_recent: number;
+  skill_vs_recent_95ci: [number, number];
+}
+
+export interface ValidationRow {
+  city: string;
+  era5_over_chirps_total: number;
+  monthly_corr: number;
+  anomaly_corr: number;
+  spi3_corr: number;
+  drought_agreement: number;
+  drought_kappa: number;
+}
+
+export interface DengueBacktest {
+  source: string;
+  train_months: number;
+  test_months: number;
+  test_period: [string, string];
+  scores: Record<
+    "persistence" | "seasonal_ratio" | "ridge",
+    { mae_log: number; mae_cases: number; direction_accuracy: number | null;
+      skill_vs_persistence_log?: number }
+  >;
+  series: {
+    city: string;
+    target_date: string;
+    target_cases: number;
+    pred_persistence: number;
+    pred_seasonal_ratio: number;
+    pred_ridge: number;
+  }[];
 }
 
 export interface City {
@@ -131,6 +238,13 @@ async function get<T>(path: string, params?: Record<string, string | undefined>)
   return res.json() as Promise<T>;
 }
 
+/** Raw passthrough for downloads (CSV, RSS) proxied by route handlers. */
+export async function getRaw(path: string, params?: Record<string, string | undefined>) {
+  const url = new URL(API_URL + path);
+  for (const [k, v] of Object.entries(params ?? {})) if (v) url.searchParams.set(k, v);
+  return fetch(url, { cache: "no-store" });
+}
+
 export const api = {
   health: () => get<Health>("/health"),
   cities: () => get<City[]>("/cities"),
@@ -139,4 +253,14 @@ export const api = {
   history: (city: string, start?: string) => get<Observation[]>("/history", { city, start }),
   verification: (city?: string) => get<Verification>("/verification", { city }),
   metrics: () => get<Metrics>("/metrics"),
+  issued: (city?: string) => get<Issued[]>("/issued", { city }),
+  explain: (city: string) => get<Explanation>("/explain", { city }),
+  districts: (month?: string) => get<DistrictStatus>("/districts", { month }),
+  districtGeojson: () => get<GeoJSON.FeatureCollection>("/districts/geojson"),
+  districtEval: () => get<DistrictEval>("/districts/evaluation"),
+  districtHistory: (name: string, start?: string) =>
+    get<DistrictRow[]>(`/districts/${encodeURIComponent(name)}`, { start }),
+  heatEval: () => get<HeatEval>("/heat/evaluation"),
+  validation: () => get<ValidationRow[]>("/validation"),
+  dengue: () => get<DengueBacktest>("/dengue"),
 };

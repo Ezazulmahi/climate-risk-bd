@@ -8,14 +8,14 @@ const RISK: Record<RiskLevel, { label: string; icon: string; color: string }> = 
 };
 
 /** Status always ships as icon + label; color never carries the meaning alone. */
-export function RiskBadge({ level }: { level: RiskLevel }) {
+export function RiskBadge({ level, label }: { level: RiskLevel; label?: string }) {
   const r = RISK[level];
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface-2 px-2.5 py-0.5 text-xs font-medium">
       <span aria-hidden style={{ color: r.color }}>
         {r.icon}
       </span>
-      {r.label} drought risk
+      {label ?? `${r.label} drought risk`}
     </span>
   );
 }
@@ -24,7 +24,7 @@ export const riskColor = (level: RiskLevel) => RISK[level].color;
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <section className={`rounded-xl border border-line bg-surface p-5 ${className}`}>
+    <section className={`min-w-0 rounded-xl border border-line bg-surface p-5 ${className}`}>
       {children}
     </section>
   );

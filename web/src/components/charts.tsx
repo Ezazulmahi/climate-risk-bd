@@ -48,25 +48,53 @@ const shortMonth = (ym: string) => {
   return `${"JFMAMJJASOND"[Number(m) - 1]} ${y.slice(2)}`;
 };
 
-export function ForecastChart({ data }: { data: ForecastPoint[] }) {
+export interface ForecastLabels {
+  range: string;
+  normal: string;
+  forecast: string;
+  observed: string;
+  notYet: string;
+  mm: string;
+}
+
+const EN_LABELS: ForecastLabels = {
+  range: "80% range",
+  normal: "Normal",
+  forecast: "Forecast",
+  observed: "Observed",
+  notYet: "not yet observed",
+  mm: "mm",
+};
+
+export function ForecastChart({
+  data,
+  labels = EN_LABELS,
+}: {
+  data: ForecastPoint[];
+  labels?: ForecastLabels;
+}) {
   return (
     <ResponsiveContainer width="100%" height={320}>
       <ComposedChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -8 }}>
         <CartesianGrid stroke="var(--grid)" vertical={false} />
         <XAxis dataKey="month" tickFormatter={shortMonth} minTickGap={24} {...axis} />
-        <YAxis unit=" mm" width={64} {...axis} />
+        <YAxis unit={` ${labels.mm}`} width={64} {...axis} />
         <Tooltip
           {...tooltipStyle}
           labelFormatter={(m) => shortMonth(String(m))}
           formatter={(value, name) => {
-            if (Array.isArray(value)) return [`${Math.round(value[0])}–${Math.round(value[1])} mm`, name];
-            return [value == null ? "not yet observed" : `${Math.round(Number(value))} mm`, name];
+            if (Array.isArray(value))
+              return [`${Math.round(value[0])}–${Math.round(value[1])} ${labels.mm}`, name];
+            return [
+              value == null ? labels.notYet : `${Math.round(Number(value))} ${labels.mm}`,
+              name,
+            ];
           }}
         />
         <Legend iconType="plainline" wrapperStyle={{ fontSize: 12, color: "var(--ink-2)" }} />
         <Area
           dataKey="band"
-          name="80% range"
+          name={labels.range}
           stroke="none"
           fill="var(--band)"
           fillOpacity={0.7}
@@ -74,7 +102,7 @@ export function ForecastChart({ data }: { data: ForecastPoint[] }) {
         />
         <Line
           dataKey="normal"
-          name="Normal"
+          name={labels.normal}
           stroke="var(--normal)"
           strokeDasharray="4 4"
           strokeWidth={1.5}
@@ -83,7 +111,7 @@ export function ForecastChart({ data }: { data: ForecastPoint[] }) {
         />
         <Line
           dataKey="expected"
-          name="Forecast"
+          name={labels.forecast}
           stroke="var(--series-1)"
           strokeWidth={2}
           dot={false}
@@ -91,7 +119,7 @@ export function ForecastChart({ data }: { data: ForecastPoint[] }) {
         />
         <Line
           dataKey="observed"
-          name="Observed"
+          name={labels.observed}
           stroke="none"
           dot={{ r: 3.5, fill: "var(--ink)", stroke: "var(--surface)", strokeWidth: 1.5 }}
           activeDot={{ r: 5 }}
@@ -102,7 +130,13 @@ export function ForecastChart({ data }: { data: ForecastPoint[] }) {
   );
 }
 
-export function SpiChart({ data }: { data: SpiPoint[] }) {
+export function SpiChart({
+  data,
+  droughtLabel = "drought",
+}: {
+  data: SpiPoint[];
+  droughtLabel?: string;
+}) {
   return (
     <ResponsiveContainer width="100%" height={220}>
       <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -24 }} barCategoryGap={1}>
@@ -119,7 +153,7 @@ export function SpiChart({ data }: { data: SpiPoint[] }) {
           y={-1}
           stroke="var(--dry)"
           strokeDasharray="4 4"
-          label={{ value: "drought", position: "insideBottomLeft", fill: "var(--dry)", fontSize: 11 }}
+          label={{ value: droughtLabel, position: "insideBottomLeft", fill: "var(--dry)", fontSize: 11 }}
         />
         <Bar dataKey="spi3" isAnimationActive={false} radius={[2, 2, 0, 0]}>
           {data.map((d) => (
