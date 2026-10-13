@@ -1,13 +1,22 @@
-# climate-risk-bd: Bangladesh rainfall and drought outlook
+# climate-risk-bd: Bangladesh climate risk outlook
 
-A full-stack forecasting app. It gives one-month-ahead **rainfall** and **drought-risk** forecasts for Bangladesh divisions, built on 45 years of ERA5 reanalysis, and stores every past forecast so its accuracy can be checked against what actually fell.
+A full-stack climate-risk app for Bangladesh. It covers:
 
-- **ML pipeline (Python):** data audit, cleaning, SPI, leakage-safe features, honest baselines, uncertainty and error analysis.
-- **Backend:** FastAPI on PostgreSQL, serving observations, forecasts, verification and metrics.
-- **Frontend:** Next.js 16 with a risk map, division pages with forecast-vs-observed charts, and a model and accuracy page.
+- one-month-ahead **rainfall**, **drought** and **heat-wave** outlooks for the 8 divisions;
+- a **64-district Drought Monitor**;
+- a **dengue** forecasting backtest;
+- a **drought index-insurance simulator**.
+
+It stores every forecast and publishes how each one compared with what actually happened. The site is available in English and বাংলা.
+
+- **ML pipeline (Python):** data audits, cleaning, SPI, leakage-safe features, honest baselines, uncertainty, error analysis and controlled experiments (ENSO/IOD indices, LSTM).
+- **Backend:** FastAPI on PostgreSQL, serving forecasts, a frozen forecast log, explanations, verification, CSV exports and an RSS alerts feed.
+- **Frontend:** Next.js 16 with an outlook map, division pages, a district choropleth, dengue and insurance pages, a model page and a Bangla toggle.
 - **Ops:** Docker Compose, a Render + Neon + Vercel deployment and a monthly data-refresh workflow.
 
 ![Outlook page](docs/screenshot-outlook.jpg)
+
+![64-district drought monitor](docs/screenshot-monitor.jpg)
 
 ## What this project does, in plain words
 
@@ -16,7 +25,14 @@ Bangladesh's farming, water supply and flood planning all depend on rain, and mo
 1. **How much rain is likely next month?** Each forecast is a best guess plus a range, compared with what is normal for that month.
 2. **What is the chance that next month tips into drought?** The answer is a probability, shown next to the usual chance.
 
-It then **checks its own work**. Every forecast it would have made since 2016 is stored next to the rain that actually fell, so anyone can see how often it was right. The website shows that track record next to every forecast.
+It then **checks its own work**. Every forecast it would have made since 2016 is stored next to the rain that actually fell, so anyone can see how often it was right. New live forecasts are also frozen the moment they are published, so the record can't be quietly rewritten later.
+
+It also offers:
+
+- **Drought Monitor for all 64 districts:** a monthly map in the style of the US Drought Monitor (categories D0 to D4), built from CHIRPS satellite-and-gauge rainfall, with next month's drought odds.
+- **Heat-wave outlook:** expected days at or above 36 °C, the Bangladesh Meteorological Department's heat-wave threshold.
+- **Dengue:** a test of whether next month's cases by division can be forecast (2020–2025 data).
+- **Index-insurance simulator:** pick a district, a rice season and a payout rule, and see which years since 1981 would have paid.
 
 ### How it works, step by step
 
@@ -33,16 +49,18 @@ It then **checks its own work**. Every forecast it would have made since 2016 is
 | 9. Show | A Next.js website draws the map, forecast cards, charts and track record | `web/` |
 | 10. Repeat | Once a month an automated job downloads the newest month, rebuilds and republishes, so the site moves forward on its own | `.github/workflows/refresh.yml` |
 
+Alongside the city model, `districts.py` builds the 64-district monitor from CHIRPS, `validation.py` checks ERA5 against CHIRPS, `heat.py` and `dengue.py` add the heat and dengue models, `explain.py` explains each drought forecast, and `experiments.py` and `lstm.py` run the controlled experiments.
+
 ### How to read a forecast
 
 Example from the live site, **Dhaka, October 2026**:
 
-> Expected rainfall **104 mm** (normal is 138 mm). 80% range **41–149 mm**. Drought probability **62%** (usually 16%): **High** risk.
+> Expected rainfall **88 mm** (normal is 138 mm). 80% range **43–191 mm**. Drought probability **55%** (usually 16%): **High** risk.
 
 - **Expected rainfall** is the single best guess. Treat it loosely, because the evaluation shows rainfall amounts a month ahead are hard to predict.
 - **80% range:** in 8 out of 10 months the real total should land inside it. This is the number to plan with.
 - **Normal:** the 1981–2015 average for that month, for comparison.
-- **Drought probability:** the chance that the 3 months ending next month are among the driest ~16% on record for that time of year. "Usually 16%" is the background rate. 62% means drought is about four times more likely than usual. Most of that signal comes from the two months that have already been dry.
+- **Drought probability:** the chance that the 3 months ending next month are among the driest ~16% on record for that time of year. "Usually 16%" is the background rate. 55% means drought is more than three times as likely as usual. The site's "Why this drought risk?" panel shows that almost all of it comes from rain already observed: a dry September, with a very wet July about to leave the 3-month window.
 - **Risk level:** *Low*, *Elevated* (≥1.5× the usual chance) or *High* (≥2.5× and at least 50%).
 
 ### Key terms
@@ -63,11 +81,23 @@ Example from the live site, **Dhaka, October 2026**:
 
    ![POWER vs ERA5](reports/figures/data_power_vs_era5.png)
 
-2. **Next month's rainfall amount is not predictable from local history.** On the 2020–2026 test years, neither ridge regression nor gradient boosting beats "assume a normal month". Ridge's MAE skill is +0.6% with a 95% CI of −2.5% to +3.9%. That is the expected scientific result: skill at this lead time comes from large-scale climate drivers and dynamical models, not lagged local rainfall.
+2. **Next month's rainfall amount is barely predictable from local history.** On the 2020–2026 test years, neither ridge regression nor gradient boosting beats "assume a normal month". Ridge's MAE skill is +0.3% with a 95% CI of −2.9% to +3.9%. That is the expected scientific result: skill at this lead time comes from large-scale climate drivers and dynamical models, not lagged local rainfall.
 
-3. **Drought risk is predictable, and a simple physics-based baseline matches ML.** P(SPI-3 ≤ −1 next month) reaches ROC-AUC about 0.91 and a Brier skill of +39% over the base rate. But two of SPI-3's three months are already known, and a **climatological ensemble** captures that: known rain plus every historical value of next month. Logistic regression and gradient boosting do not improve on it (−2% to −3% Brier). Without that baseline, the ML models would look much better than they are.
+3. **Drought risk is predictable, and a simple physics-based baseline matches ML.** P(SPI-3 ≤ −1 next month) reaches ROC-AUC about 0.90 and a Brier skill of +38% over the base rate. But two of SPI-3's three months are already known, and a **climatological ensemble** captures that: known rain plus every historical value of next month. Logistic regression and gradient boosting do not improve on it (−0.4% to −4% Brier). Without that baseline, the ML models would look much better than they are.
 
-4. **Intervals are close but slightly overconfident.** The 80% conformal intervals cover 76.7% of test months, and only 71% in the monsoon, because recent monsoons were more extreme than the 2016–2019 calibration years.
+4. **Intervals are close but slightly overconfident.** The 80% conformal intervals cover 75.9% of test months, and only about 71–72% in the pre-monsoon and monsoon seasons, because recent seasons were more extreme than the 2016–2019 calibration years.
+
+5. **Global climate drivers might help, but the rules say "not yet".** Adding ENSO and Indian Ocean Dipole indices (each lagged to when it is actually published) made no difference on the validation years, so they stay off. On the 2020–2026 test years the same model shows **+7.1% rainfall skill (95% CI +4.1% to +10.2%)**. Switching it on because of that would tune the model to the test set, so I report it instead ([experiment](reports/experiment_climate_indices.md)).
+
+6. **An LSTM finds a small, consistent rainfall gain.** Across 5 random seeds it gets **+4.9% to +6.0%** rainfall skill, but it is no better than the ensemble for drought ([experiment](reports/experiment_lstm.md)). It isn't deployed, because seeds measure training noise, not year-to-year luck.
+
+7. **ERA5 agrees with gauge-blended rainfall, but only moderately on drought months.** Against CHIRPS (satellite + rain gauges), ERA5 totals are within 13% in every city and monthly anomalies correlate at 0.51–0.70. Drought-month agreement is only moderate (Cohen's κ 0.38–0.53), which is why the district monitor uses CHIRPS directly ([check](reports/data_validation_chirps.md)).
+
+8. **The district drought outlook works.** Over 5,120 test district-months it is **38.9% better** than the usual rate (Brier skill).
+
+9. **Heat and dengue follow the same pattern: simple baselines are hard to beat.**
+   - **Heat-wave days:** the model is +4.6% better than the 1981–2015 normal but only +1.7% better than the last decade's average (CI includes zero). It missed Rajshahi's record April 2024, expecting 7 heat-wave days when 24 happened ([report](reports/heat_evaluation.md)).
+   - **Dengue:** a seasonal growth ratio beats "same as this month" by 39.5%, and adding weather does not improve on it ([report](reports/dengue_evaluation.md)).
 
 Full numbers: [`reports/evaluation.md`](reports/evaluation.md) · EDA: [`reports/eda.md`](reports/eda.md) · Limitations: [`MODEL_CARD.md`](MODEL_CARD.md)
 
@@ -82,7 +112,7 @@ Standing at the end of month *t*, predict for month *t+1* in each city:
 
 **Data:** ERA5 daily reanalysis via the [Open-Meteo archive](https://open-meteo.com/en/docs/historical-weather-api) (no API key), with rainfall, temperature, humidity and wind from 1981 onward. Data is aggregated to complete calendar months.
 
-**Locations:** Dhaka, Chattogram, Khulna, Rajshahi, Sylhet, Barishal and Rangpur. Mymensingh is configured but missing from the current run because the download hit Open-Meteo's hourly rate limit; rerun `python -m climrisk all` to add it.
+**Locations:** the 8 divisional capitals (Dhaka, Chattogram, Khulna, Rajshahi, Sylhet, Barishal, Rangpur, Mymensingh) for the city models, and all 64 districts for the drought monitor.
 
 ## Method
 
@@ -153,6 +183,17 @@ pytest
 
 The processed data is committed, so `train` and `evaluate` work offline. `python -m climrisk update` fetches only recent months, which is what the monthly job uses.
 
+Other steps:
+
+| Command | What it does |
+|---|---|
+| `python -m climrisk districts` | Downloads CHIRPS and the district boundaries, builds the 64-district monitor and the ERA5 check |
+| `python -m climrisk heat` | Heat-wave outlook (also part of `all`) |
+| `python -m climrisk dengue` | Dengue backtest |
+| `python -m climrisk experiment` | ENSO/IOD with-vs-without comparison |
+| `python -m climrisk experiment-lstm` | LSTM experiment; needs `pip install -e ".[experiments]"` |
+| `python -m climrisk db-sync` | Publishes everything above to the database |
+
 **2. PostgreSQL.** Any Postgres works; set `DATABASE_URL` (see `.env.example`). Without Docker, a throwaway local server with no password, on port 54330:
 
 ```bash
@@ -178,11 +219,17 @@ Interactive docs are at http://127.0.0.1:8000/docs.
 
 | Endpoint | Returns |
 |---|---|
-| `GET /forecasts/latest` | The live forecast for every division |
+| `GET /forecasts/latest` | The live forecast for every division (rainfall, drought, heat) |
 | `GET /forecast?city=Dhaka&month=2024-08` | One stored forecast, with its observed outcome if known |
 | `GET /forecasts?city=Sylhet&start=2022-01` | A city's forecast history with outcomes |
 | `GET /verification?city=Dhaka` | Skill, interval coverage and drought Brier score computed from stored forecasts |
 | `GET /history?city=Sylhet&start=2020-01` | Monthly rainfall, normal, anomaly, SPI-3 |
+| `GET /issued?city=Dhaka` | Frozen forecast log: each live forecast exactly as first published |
+| `GET /explain?city=Dhaka` | Top drivers of the live drought probability |
+| `GET /districts`, `/districts/{name}`, `/districts/geojson`, `/districts/evaluation` | 64-district drought monitor |
+| `GET /heat/evaluation`, `/dengue`, `/validation` | Heat outlook skill, dengue backtest, ERA5-vs-CHIRPS check |
+| `GET /export/forecasts.csv`, `/export/districts.csv` | CSV downloads |
+| `GET /alerts.rss` | RSS feed of drought, heat and district warnings |
 | `GET /cities`, `/metrics`, `/health` | Locations, full test evaluation, status |
 
 **4. Web app**
@@ -198,6 +245,18 @@ npm run dev
 ```
 
 Then open http://localhost:3000. Set `API_URL` if the API isn't on `http://localhost:8000`.
+
+Pages:
+
+- `/`: outlook map and division cards
+- `/city/[name]`: forecast, "why this risk", heat, forecast-vs-observed chart, SPI history, frozen log
+- `/monitor`: 64-district map
+- `/dengue`
+- `/insurance`
+- `/model`
+- `/data`: downloads, RSS, API reference and sources
+
+The header button switches English/বাংলা.
 
 **Or all at once with Docker:**
 
@@ -218,16 +277,20 @@ The Streamlit notebook-style dashboard (`streamlit run app/dashboard.py`) is sti
 | Web | [Vercel](https://vercel.com) | Import the repo, set root directory to `web`, and set `API_URL` to the Render URL |
 | Refresh | GitHub Actions | `.github/workflows/refresh.yml` runs on the 10th of each month and commits new data, which redeploys the API, which republishes forecasts |
 
+On Render, also set `WEB_URL` to the Vercel address so links in the RSS feed point to the site.
+
 On each deploy, the Docker image retrains from the committed data. Training years are fixed and seeds are set, so the model version is identical across rebuilds. Only the live forecast and the verified months move forward.
 
 ## Project layout
 
 ```
 src/climrisk/   config · ingest · clean · spi · features · train · evaluate · eda · predict
-                db · sync (Postgres publishing) · api (FastAPI) · cli
-web/            Next.js app: outlook map, /city/[name], /model
+                indices (ENSO/IOD) · experiments · lstm · districts (CHIRPS) · validation
+                heat · dengue · explain · db · sync (Postgres publishing) · api (FastAPI) · cli
+web/            Next.js app: outlook, /city/[name], /monitor, /dengue, /insurance, /model, /data
 app/            Streamlit analysis dashboard
-tests/          41 offline tests (ingest, cleaning, SPI, leakage, models, DB sync, API)
+tests/          65 offline tests (ingest, cleaning, SPI, leakage, models, districts, heat, dengue,
+                LSTM, DB sync, frozen log, API, RSS, CSV)
 scripts/        check_power_homogeneity.py (the data-source audit)
 docs/           landscape.md (related work, US–Bangladesh gap, roadmap) and screenshots
 data/processed/ cleaned monthly data and features (committed; raw downloads are cached, not committed)
@@ -257,17 +320,31 @@ Public climate-risk tools that are routine in the US have no continuous equivale
 
 ## Roadmap
 
+Done:
+
+- 64-district drought monitor
+- ENSO and IOD experiment
+- heat-wave outlook
+- dengue backtest
+- insurance simulator
+- independent data check against CHIRPS
+- frozen forecast log
+- forecast explanations
+- RSS alerts and CSV exports
+- LSTM experiment
+- Bangla interface
+
+Next:
+
 | Next | Why |
 |---|---|
-| **Bangladesh Drought Monitor**: all 64 districts, monthly map + outlook | Closest equivalent to the US Drought Monitor; ERA5 already covers the country |
-| **Add ENSO and Indian Ocean Dipole indices** | The most plausible source of real one-month rainfall skill |
-| **Dhaka heat-stress forecast** | Heat-health warnings, similar to NWS HeatRisk; data already ingested |
-| **Dengue outbreak forecast for Dhaka** | Weather-driven; reuses the full pipeline, similar to CDC FluSight |
-| **Rice yield outlook per district** | Adds satellite NDVI, similar to USDA yield forecasts |
-| **Drought-index insurance simulator** | Back-tests payout triggers on 45 years of SPI |
-| **Gauge validation** against BMD stations, and **prospective verification** (freeze each forecast at issue time) | Stronger evidence of accuracy |
+| **Re-test ENSO/IOD and the LSTM on a longer period** | Both look promising on 2020–2026; a few more years, or a rolling-origin evaluation, would show whether it's real |
+| **Live dengue forecasts** | Needs an automated feed of the daily DGHS case counts |
+| **Validation against BMD rain-gauge stations** | The gold standard; needs station data from BMD |
+| **Rice yield outlook per district** | Adds satellite greenness (NDVI), similar to USDA yield forecasts |
+| **Upazila-level monitor** | CHIRPS is fine enough (~5 km) to go below district level |
 
-Details, data sources and baselines for each are in [`docs/landscape.md`](docs/landscape.md#3-roadmap).
+Details, data sources and baselines are in [`docs/landscape.md`](docs/landscape.md#3-roadmap).
 
 ## License
 

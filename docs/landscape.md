@@ -68,6 +68,21 @@ Flood forecasting is where Bangladesh is relatively strong (FFWC, Google Flood H
 
 Ordered by how directly each one reuses the existing pipeline (ingest → clean → features → baseline vs. ML → stored forecasts → API → web).
 
+Status as of October 2026:
+
+| Done | Result |
+|---|---|
+| 1. Bangladesh Drought Monitor (64 districts) | Built from CHIRPS (`/monitor`); outlook Brier skill +38.9% |
+| 2. ENSO and IOD indices | Experiment: no validation gain (off); +7.1% on test, reported only |
+| 3. Heat-stress outlook | All 8 divisions; about as good as the last decade's average |
+| 4. Dengue forecast | Backtest on 2020–2025 data; the seasonal baseline wins |
+| 6. Drought-index insurance simulator | Interactive (`/insurance`) |
+| 9. Gauge validation (partial) | Against CHIRPS (satellite + gauges); BMD stations still needed |
+| 10. Prospective verification | `issued_forecasts` append-only log |
+
+Still open: 5 (rice yield), 7 (waterlogging), 8 (landslides), full BMD gauge validation and live dengue.
+
+
 | # | Project | New data needed | Baseline to beat | Effort |
 |---|---|---|---|---|
 | 1 | **Bangladesh Drought Monitor**: all 64 districts, monthly map with US Drought Monitor-style categories plus a one-month outlook | None (ERA5 covers the country) | Climatological ensemble | Small |

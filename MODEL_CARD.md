@@ -1,4 +1,4 @@
-# Model card: Bangladesh one-month rainfall and drought outlook
+# Model card: Bangladesh climate risk outlook
 
 ## What it predicts
 
@@ -14,6 +14,11 @@ Standing at the end of month *t*, for each of eight divisional cities:
 - **Source:** ERA5 reanalysis (ECMWF), daily, via the Open-Meteo historical archive, pinned to `models=era5`. Aggregated to complete calendar months.
 - **Locations:** one grid point (~0.25°, about 28 km) nearest each city centre: Dhaka, Chattogram, Khulna, Rajshahi, Sylhet, Barishal, Rangpur, Mymensingh.
 - **Period:** January 1981 to the most recent complete month (ERA5 runs about one week behind real time).
+- **District monitor:** CHIRPS v2.0 monthly rainfall (satellite + gauges, 0.05°), averaged over each of the 64 districts (geoBoundaries ADM2, BBS/OCHA).
+- **Independent check:** ERA5 against CHIRPS at each city. Totals are within 13%, anomaly correlation is 0.51–0.70, and drought-month agreement is moderate (κ 0.38–0.53). See `reports/data_validation_chirps.md`.
+- **Other inputs:**
+  - ENSO (NOAA CPC ONI) and the Indian Ocean Dipole (NOAA PSL DMI), both used only in an experiment;
+  - dengue cases by division, 2020–2025 (Hasan et al., Mendeley Data, CC BY 4.0, compiled from DGHS bulletins).
 - **Rejected source:** NASA POWER `PRECTOTCORR`. Its Bangladesh precipitation has a step change: Dhaka is about 1,000 mm/yr in the early 1990s and 2,500–4,600 mm/yr after 2016. That would make any anomaly or SPI meaningless. See `reports/data_source_check.md`.
 
 ## Training procedure
@@ -45,6 +50,18 @@ See [`reports/evaluation.md`](reports/evaluation.md) for the full tables. It cov
 - **Drought:** ROC-AUC, PR-AUC, Brier score, precision/recall/F1 and a reliability diagram.
 - **Error analysis:** errors by season and city, the ten largest errors, and permutation importance.
 
+## Other models in this project
+
+| Model | Method | Test result |
+|---|---|---|
+| District drought outlook | Climatological ensemble on CHIRPS SPI-3 | Brier skill +38.9% vs base rate (5,120 district-months) |
+| Heat-wave days (Tmax ≥ 36 °C) | Poisson gradient boosting vs normal and last-decade baselines | +4.6% vs normal, +1.7% vs last decade (CI includes 0) |
+| Dengue cases, one month ahead | Persistence vs seasonal growth ratio vs ridge + weather | Seasonal ratio best: +39.5% vs persistence (log MAE) |
+| ENSO/IOD features (experiment) | Same models, indices lagged to publication | No gain on validation (off); +7.1% rainfall skill on test (reported only) |
+| LSTM (experiment) | 12-month sequences, 5 seeds | Rainfall +4.9% to +6.0%; drought no better than the ensemble |
+
+Each live forecast is also written to an append-only `issued_forecasts` table when first published. Later retraining cannot change that record.
+
 ## Intended use
 
 A teaching and portfolio demonstration of a careful forecasting workflow. **It is not an operational forecast.** For decisions affecting people, crops or water, use the Bangladesh Meteorological Department (BMD) and the Flood Forecasting and Warning Centre (FFWC).
@@ -58,6 +75,9 @@ A teaching and portfolio demonstration of a careful forecasting workflow. **It i
 - **Non-stationarity.** Climatology is fixed to 1981–2015. If the climate shifts, anomalies drift and the drought base rate changes; the test period's drought rate already differs from the training rate.
 - **Small evaluation sample.** About 6–7 test years. Bootstrap CIs are wide, and differences of a few percent between models are not significant.
 - **Dry-season SPI is noisy.** December to February totals are near zero, so small absolute changes move SPI a lot.
+- **Heat counts are on the low side.** ERA5 grid temperatures run cooler than city weather stations, so heat-wave counts are lower than BMD reports. Read the heat outlook as relative risk.
+- **Dengue data is short.** Only six seasons, and case counts depend on testing and reporting. The dengue page is a backtest, not a live forecast.
+- **Insurance simulator caveats.** It ignores basis risk (an index never matches one farm's loss) and real-world pricing. It is for education only.
 
 ## Ethical considerations
 
